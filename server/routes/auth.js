@@ -3,40 +3,41 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const pool = require('../db'); // Import the database connection pool
+const pool = require('../db');
+const authMiddleware = require('../middleware/authMiddleware'); // <-- ADD THIS LINE
 
 const router = express.Router();
 
 // --- User Registration Endpoint ---
-// Endpoint: POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    // Note: your client sends 'fullName', but your code here used 'fullname'. Let's standardize on fullName.
+    const { username, password, fullName } = req.body; 
 
-    // 1. Validate input
-    if (!username || !password || password.length < 6) {
-      return res.status(400).json({ message: 'Invalid input. Password must be at least 6 characters.' });
+    if (!username || !password || !fullName || password.length < 6) {
+      return res.status(400).json({ message: 'All fields are required. Password must be at least 6 characters.' });
     }
 
-    // 2. Hash the password
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // 3. Insert the new user into the database
     const newUser = await pool.query(
-      "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username",
-      [username, passwordHash]
+      "INSERT INTO users (username, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id, username, full_name",
+      [username, passwordHash, fullName]
     );
-
-    // 4. Send success response
-    res.status(201).json({ 
-        message: 'User registered successfully', 
-        user: newUser.rows[0] 
+    
+    const user = newUser.rows[0];
+    res.status(201).json({
+        message: 'User registered successfully',
+        user: {
+          id: user.id,
+          username: user.username,
+          fullName: user.full_name // Map database snake_case to API camelCase
+        }
     });
 
   } catch (err) {
-    // Handle potential errors, like a duplicate username
-    if (err.code === '23505') { // Unique violation error code
+    if (err.code === '23505') {
         return res.status(409).json({ message: 'Username already exists.' });
     }
     console.error(err.message);
@@ -46,46 +47,78 @@ router.post('/register', async (req, res) => {
 
 
 // --- User Login Endpoint ---
-// Endpoint: POST /api/auth/login
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        // 1. Find user in the database
         const userResult = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
         if (userResult.rows.length === 0) {
-            return res.status(401).json({ message: 'username is not valid' });
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
         const user = userResult.rows[0];
 
-        // 2. Compare the provided password with the stored hash
         const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) {
-            return res.status(401).json({ message: 'Password is not correct!!' });
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        // 3. Create a JWT
         const payload = {
             userId: user.id,
             username: user.username,
+            fullName: user.full_name,
         };
         const token = jwt.sign(
             payload, 
             process.env.JWT_SECRET,
-            { expiresIn: '7d' } // Token will be valid for 7 days
+            { expiresIn: '7d' }
         );
         
-        // 4. Send the token to the client
         res.json({ 
             message: 'Logged in successfully',
             token,
-            user: { id: user.id, username: user.username }
+            user: { 
+              id: user.id, 
+              username: user.username, 
+              fullName: user.full_name // Map database snake_case to API camelCase
+            }
         });
 
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
     }
+});
+
+
+// --- Get User Profile Endpoint (Protected) ---
+// THIS IS THE NEW ROUTE YOU NEED TO ADD
+router.get('/profile', authMiddleware, async (req, res) => {
+  try {
+    // The user ID is added to req.user by the authMiddleware
+    const userId = req.user.userId;
+
+    // Fetch the user's data from the database, excluding the password hash
+    const userResult = await pool.query(
+      "SELECT id, username, full_name FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    // Send back the user profile, mapping to camelCase for consistency
+    res.json({
+      id: user.id,
+      username: user.username,
+      fullName: user.full_name
+    });
+
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
 });
 
 

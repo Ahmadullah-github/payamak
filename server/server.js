@@ -4,6 +4,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const socketAuth = require('./middleware/socketAuthMiddleware'); 
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -33,9 +34,13 @@ app.get('/', (req, res) => {
   res.send('<h1>Chat Server is running</h1>');
 });
 
-// --- Socket.IO Connection Logic (we will build this next) ---
+io.use(socketAuth);
+
+
 io.on('connection', (socket) => {
-  console.log('✅ A user connected');
+  console.log(`✅ user connected: ${socket.user.id} with socketId: ( socket id: ${socket.id} )`);
+
+
   socket.on('disconnect', () => {
     console.log('❌ User disconnected');
   });
@@ -43,6 +48,8 @@ io.on('connection', (socket) => {
 
 
 // --- Start the Server ---
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server listening on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', async () => {
+  console.log(`🚀 Server listening on http://0.0.0.0:${PORT}`);
+  const allUsers = await pool.query(`select * from users`)
+  console.log(`ALL userd from Db: `, allUsers.rows);
 });
