@@ -9,23 +9,23 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-pool.on('connect', () => {
-  console.log('Connected to the PostgreSQL database');
-});
+  pool.on('connect', () => {
+    console.log('Connected to the PostgreSQL database');
+  });
 
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+    process.exit(-1);
+  });
 
-// Test the connection
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error connecting to the database:', err.stack);
-    return;
-  }
-  console.log('Database connection successful');
-  release();
-});
+  // Test the connection
+  pool.connect((err, client, release) => {
+    if (err) {
+      console.error('Error connecting to the database:', err.stack);
+      return;
+    }
+    console.log('Database connection successful');
+    release();
+  });
 
 module.exports = pool;

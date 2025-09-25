@@ -5,10 +5,11 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const socketAuth = require('./middleware/socketAuthMiddleware'); 
-
-// Import routes
 const authRoutes = require('./routes/auth');
+const usersRoutes = require('./routes/users');
+const messagesRoutes = require('./routes/messages');
 const pool = require('./db');
+const { initializeSocket } = require('./socketHandler');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,29 +28,20 @@ app.use(express.json()); // Allow the server to parse JSON request bodies
 
 // --- API Routes ---
 // Use the authentication routes for any request to /api/auth
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes(pool));
+app.use('/api/users', usersRoutes(pool));
+app.use('/api/messages', messagesRoutes(pool));
 
-// Simple test route
-app.get('/', (req, res) => {
-  res.send('<h1>Chat Server is running</h1>');
-});
 
 io.use(socketAuth);
-
-
-io.on('connection', (socket) => {
-  console.log(`✅ user connected: ${socket.user.id} with socketId: ( socket id: ${socket.id} )`);
-
-
-  socket.on('disconnect', () => {
-    console.log('❌ User disconnected');
-  });
-});
+initializeSocket(io, pool);
 
 
 // --- Start the Server ---
-server.listen(PORT, '0.0.0.0', async () => {
-  console.log(`🚀 Server listening on http://0.0.0.0:${PORT}`);
-  const allUsers = await pool.query(`select * from users`)
-  console.log(`ALL userd from Db: `, allUsers.rows);
-});
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', async () => {
+    console.log(`🚀 Server listening on http://0.0.0.0:${PORT}`);
+  });
+}
+
+module.exports = { app, server };
