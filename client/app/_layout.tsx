@@ -1,58 +1,52 @@
 // client/app/_layout.tsx
-import React, { useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
-import { useAuthStore } from '../store/authStore';
-import { Text, View, StyleSheet } from 'react-native';
-import SplashScreen from '@/components/SplashScreen';
 
+import React, { useEffect } from 'react';
+import { Stack } from 'expo-router';
+import { useAuthStore } from '../store/authStore';
+import { useSocketStore } from '@/store/socketStore';
+import SplashScreen from '@/components/SplashScreen';
+import "../global.css"
 
 const InitialLayout = () => {
-  const token = useAuthStore((state) => state.token);
-  const isLoading = useAuthStore((state) => state.isLoading);
-  const initializeAuth = useAuthStore((state) => state.initializeAuth); // 👈 get the function
+  const token =  useAuthStore((state) => state.token)
+  const isLoading =  useAuthStore((state) => state.isLoading)
+  const initializeAuth =  useAuthStore((state) => state.initializeAuth)
+  const { connect, disconnect } = useSocketStore();
 
-  const segments = useSegments() as string[];
-  const router = useRouter();
-
+  // Initialize authentication state on component mount
   useEffect(() => {
-    console.log('🚀 _layout: Calling initializeAuth...');
-    initializeAuth(); // 👈 This was missing in your version!
+    initializeAuth();
   }, [initializeAuth]);
 
-  
+  // Manage the socket connection based on the token
   useEffect(() => {
-    if (isLoading || segments.length === 0) {
-      console.log('⏳ Still loading or segments not ready...');
-      return;
+    if (token) {
+      console.log('🔌 Auth token found, Establishing socket connection...');
+      connect(token);
     }
+    return () => {
+      console.log('🔌 Token removed or changed, Cleaning up socket connection...');
+      disconnect();
+    };
+  }, [token, connect, disconnect]);
 
-    const inAppGroup = segments[0] === '(app)';
-
-    if (token && !inAppGroup) {
-      console.log('✅ Authenticated → redirect to /chat');
-      router.replace('/(app)/chat');
-    } else if (!token && inAppGroup) {
-      console.log('✅ Not authenticated → redirect to /login');
-      router.replace('/(auth)/login');
-    }
-  }, [token, isLoading, segments]);
-
+  // Show a splash screen while the auth state is loading
   if (isLoading) {
-    console.log('📱 Showing SplashScreen...');
     return <SplashScreen />;
   }
 
-  console.log('✅ Rendering Slot...');
-  return <Slot />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={!!token}>
+        <Stack.Screen name="(app)" />
+      </Stack.Protected>
+      <Stack.Protected guard={!token}>
+        <Stack.Screen name="(auth)/index" />
+      </Stack.Protected>
+    </Stack>
+  );
 };
+
 export default function RootLayout() {
   return <InitialLayout />;
 }
-
-const styles = StyleSheet.create({
-  splashContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

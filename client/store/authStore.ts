@@ -19,6 +19,7 @@ interface AuthState {
   register: (username: string, password: string, fullName: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
+  updateUserProfile: (newUserData: Partial<User>) => void;
 }
 
 // 👇 Extracted for reuse and to avoid `get()` recursion
@@ -90,6 +91,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const message = error.response?.data?.message || 'Registration failed';
       return { success: false, message };
     }
+  },
+
+  updateUserProfile: (newUserData) => {
+    set((state) => ({
+      user: state.user ? { ...state.user, ...newUserData } : null,
+    }));
   },
 }));
 
