@@ -1,29 +1,34 @@
 // server/socketHandler.js
 
 const  {verifyToken} =  require("./utils/jwt");
+const NotificationService = require('./utils/notifications');
+const { logger } = require('./middleware/errorHandler');
 
 // This map will store online users.
 // Key: userId, Value: socket.id
 const onlineUsers = new Map();
 
 const initializeSocket = (io, pool) => {
+  // Initialize notification service
+  const notificationService = new NotificationService(io, pool);
+  
   // Your Socket.IO authentication middleware
   io.use((socket, next) => {
     // ... JWT verification logic ...
     const token = socket.handshake.auth.token
-    console.log("Token from socket handshake: ", token);
+    logger.info("Token from socket handshake: ", token);
     const user = verifyToken(token);
     if (!user) {
       return next(new Error('Authentication error'));
     }
     // Attach userId to socket
-    console.log("Verified userId from token: ", user.userId);
+    logger.info("Verified userId from token: ", user.userId);
     socket.userId = user.userId;
     next();
   });
 
   io.on('connection', async (socket) => {
-    console.log(`✅ User connected: ${socket.userId} with socket ID: ${socket.id}`);
+    logger.info(`✅ User connected: ${socket.userId} with socket ID: ${socket.id}`);
 
     try {
       // Update user status in database
@@ -36,17 +41,25 @@ const initializeSocket = (io, pool) => {
       
       // --- Presence Logic ---
       onlineUsers.set(socket.userId, socket.id);
+      notificationService.setUserOnline(socket.userId, socket.id);
+      
       socket.broadcast.emit('user_online', { userId: socket.userId });
       socket.emit('current_online_users', Array.from(onlineUsers.keys()));
       
+      // Send pending notifications
+      const unreadNotifications = await notificationService.getUnreadNotifications(socket.userId);
+      if (unreadNotifications.length > 0) {
+        socket.emit('pending_notifications', unreadNotifications);
+      }
+      
     } catch (error) {
-      console.error('Error updating user status on connect:', error);
+      logger.error('Error updating user status on connect:', error);
     }
 
     
     // --- Enhanced Disconnect Logic ---
     socket.on('disconnect', async () => {
-      console.log(`❌ User disconnected: ${socket.userId}`);
+      logger.info(`❌ User disconnected: ${socket.userId}`);
       
       try {
         // Update user status in database
@@ -58,10 +71,11 @@ const initializeSocket = (io, pool) => {
         );
         
         onlineUsers.delete(socket.userId);
+        notificationService.setUserOffline(socket.userId);
         socket.broadcast.emit('user_offline', { userId: socket.userId });
         
       } catch (error) {
-        console.error('Error updating user status on disconnect:', error);
+        logger.error('Error updating user status on disconnect:', error);
       }
     });
 
@@ -159,8 +173,11 @@ const initializeSocket = (io, pool) => {
         // Send confirmation to sender
         socket.emit('message_sent', messageData);
         
+        // Send notifications to offline users
+        await notificationService.notifyNewMessage(messageData, chatId, socket.userId);
+        
       } catch (error) {
-        console.error('Error saving message:', error);
+        logger.error('Error saving message:', error);
         socket.emit('message_error', { error: 'Failed to send message' });
       }
     });

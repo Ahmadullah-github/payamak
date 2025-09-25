@@ -1,12 +1,24 @@
 // File: server/routes/messages.js
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
+const { mediaUpload, processMediaImage, cleanupOnError } = require('../middleware/upload');
+const { messageLimiter, uploadLimiter } = require('../middleware/rateLimiter');
+const { 
+  validateMessage, 
+  validateChatCreation, 
+  validateChatId, 
+  validateMessageId, 
+  validatePagination 
+} = require('../middleware/validation');
+const { logger } = require('../middleware/errorHandler');
+const pool = require('../db');
+const { refreshChatListView, getUnreadCountForUser } = require('../utils/dbUtils');
 
 module.exports = function(pool) {
     const router = express.Router();
 
     // Get recent chats for the current user (optimized with new schema)
-    router.get('/chats', authMiddleware, async (req, res) => {
+    router.get('/chats', authMiddleware, validatePagination, async (req, res) => {
       try {
         const userId = req.user.userId;
 
@@ -92,7 +104,7 @@ module.exports = function(pool) {
     });
 
     // Get chat messages (optimized for both direct and group chats)
-    router.get('/chat/:chatId', authMiddleware, async (req, res) => {
+    router.get('/chat/:chatId', authMiddleware, validateChatId, validatePagination, async (req, res) => {
       try {
         const currentUserId = req.user.userId;
         const chatId = req.params.chatId;
@@ -106,10 +118,10 @@ module.exports = function(pool) {
         );
         
         if (memberCheck.rows.length === 0) {
-          return res.status(403).json({ message: 'Access denied to this chat' });
+          return res.status(403).json({ success: false, error: 'Access denied to this chat' });
         }
         
-        // Get messages with optimized query
+        // Get messages with media file info
         const messagesResult = await pool.query(
           `SELECT 
             m.id,
@@ -119,11 +131,16 @@ module.exports = function(pool) {
             m.message_type,
             m.status,
             m.timestamp,
+            m.media_file_id,
             sender.full_name as sender_name,
             sender.is_online as sender_online,
+            f.filename as media_filename,
+            f.mime_type as media_mime_type,
+            f.file_size as media_file_size,
             CASE WHEN mr.user_id IS NOT NULL THEN true ELSE false END as is_read
           FROM messages m
           JOIN users sender ON m.sender_id = sender.id
+          LEFT JOIN files f ON m.media_file_id = f.id
           LEFT JOIN message_reads mr ON m.id = mr.message_id AND mr.user_id = $1
           WHERE m.chat_id = $2
           ORDER BY m.timestamp DESC
@@ -131,34 +148,53 @@ module.exports = function(pool) {
           [currentUserId, chatId, limit, offset]
         );
         
-        const messages = messagesResult.rows.map(msg => ({
-          id: msg.id.toString(),
-          chatId: msg.chat_id.toString(),
-          senderId: msg.sender_id.toString(),
-          content: msg.content,
-          type: msg.message_type,
-          status: msg.status,
-          timestamp: msg.timestamp,
-          senderName: msg.sender_name,
-          senderOnline: msg.sender_online,
-          isRead: msg.is_read
-        }));
+        const messages = messagesResult.rows.map(msg => {
+          const message = {
+            id: msg.id.toString(),
+            chatId: msg.chat_id.toString(),
+            senderId: msg.sender_id.toString(),
+            content: msg.content,
+            type: msg.message_type,
+            status: msg.status,
+            timestamp: msg.timestamp,
+            senderName: msg.sender_name,
+            senderOnline: msg.sender_online,
+            isRead: msg.is_read
+          };
+
+          // Add media file info if present
+          if (msg.media_file_id && msg.media_filename) {
+            const mediaType = msg.message_type === 'image' ? 'images' : 
+                            msg.message_type === 'video' ? 'videos' : 
+                            msg.message_type === 'audio' ? 'audio' : 'documents';
+            
+            message.mediaFile = {
+              id: msg.media_file_id,
+              filename: msg.media_filename,
+              url: `/api/files/media/${mediaType}/${msg.media_filename}`,
+              mimeType: msg.media_mime_type,
+              size: msg.media_file_size
+            };
+          }
+
+          return message;
+        });
         
-        res.json(messages.reverse()); // Return in chronological order
+        res.json({ success: true, messages: messages.reverse() }); // Return in chronological order
       } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
+        logger.error('Error fetching chat messages:', err);
+        res.status(500).json({ success: false, error: 'Server error' });
       }
     });
 
     // Save a new message (supports both direct and group chats)
-    router.post('/', authMiddleware, async (req, res) => {
+    router.post('/', authMiddleware, messageLimiter, validateMessage, async (req, res) => {
       try {
         const senderId = req.user.userId;
         const { chatId, content, type = 'text' } = req.body;
         
         if (!chatId || !content) {
-          return res.status(400).json({ message: 'Chat ID and content are required' });
+          return res.status(400).json({ success: false, error: 'Chat ID and content are required' });
         }
         
         // Verify user is member of the chat
@@ -168,7 +204,7 @@ module.exports = function(pool) {
         );
         
         if (memberCheck.rows.length === 0) {
-          return res.status(403).json({ message: 'Access denied to this chat' });
+          return res.status(403).json({ success: false, error: 'Access denied to this chat' });
         }
         
         // Insert the message into the database
@@ -190,12 +226,98 @@ module.exports = function(pool) {
           timestamp: newMessage.timestamp
         };
         
-        res.status(201).json(formattedMessage);
+        res.status(201).json({ success: true, message: formattedMessage });
       } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
+        logger.error('Error saving message:', err);
+        res.status(500).json({ success: false, error: 'Server error' });
       }
     });
+
+    // Upload and send media message
+    router.post('/media', 
+      authMiddleware, 
+      uploadLimiter,
+      mediaUpload.single('mediaFile'),
+      processMediaImage,
+      cleanupOnError,
+      async (req, res) => {
+        try {
+          if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded' });
+          }
+
+          const senderId = req.user.userId;
+          const { chatId, content = '' } = req.body;
+          const { filename, path: filePath, size, mimetype } = req.file;
+
+          if (!chatId) {
+            return res.status(400).json({ success: false, error: 'Chat ID is required' });
+          }
+
+          // Verify user is member of the chat
+          const memberCheck = await pool.query(
+            'SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2',
+            [chatId, senderId]
+          );
+
+          if (memberCheck.rows.length === 0) {
+            return res.status(403).json({ success: false, error: 'Access denied to this chat' });
+          }
+
+          // Save file info to database
+          const fileResult = await pool.query(
+            `INSERT INTO files (filename, path, mime_type, file_size, uploaded_by, description)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id`,
+            [filename, filePath, mimetype, size, senderId, content]
+          );
+
+          const fileId = fileResult.rows[0].id;
+
+          // Determine message type based on mime type
+          let messageType = 'file';
+          if (mimetype.startsWith('image/')) {
+            messageType = 'image';
+          } else if (mimetype.startsWith('video/')) {
+            messageType = 'video';
+          } else if (mimetype.startsWith('audio/')) {
+            messageType = 'audio';
+          }
+
+          // Insert the message with media file reference
+          const messageResult = await pool.query(
+            `INSERT INTO messages (chat_id, sender_id, content, message_type, media_file_id, status)
+             VALUES ($1, $2, $3, $4, $5, 'sent')
+             RETURNING id, chat_id, sender_id, content, message_type, status, timestamp`,
+            [chatId, senderId, content, messageType, fileId]
+          );
+
+          const newMessage = messageResult.rows[0];
+          const formattedMessage = {
+            id: newMessage.id.toString(),
+            chatId: newMessage.chat_id.toString(),
+            senderId: newMessage.sender_id.toString(),
+            content: newMessage.content,
+            type: newMessage.message_type,
+            status: newMessage.status,
+            timestamp: newMessage.timestamp,
+            mediaFile: {
+              id: fileId,
+              filename: filename,
+              url: `/api/files/media/${messageType === 'image' ? 'images' : messageType === 'video' ? 'videos' : messageType === 'audio' ? 'audio' : 'documents'}/${filename}`,
+              mimeType: mimetype,
+              size: size
+            }
+          };
+
+          res.status(201).json({ success: true, message: formattedMessage });
+
+        } catch (err) {
+          logger.error('Error uploading media message:', err);
+          res.status(500).json({ success: false, error: 'Failed to upload media message' });
+        }
+      }
+    );
 
     // Update message status (delivered/read) - optimized for group chats
     router.patch('/:messageId/status', authMiddleware, async (req, res) => {
