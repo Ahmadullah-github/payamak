@@ -1,8 +1,8 @@
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import React from 'react';
 import { Stack, router } from 'expo-router';
-import { useAuthStore } from '../../store/authStore';
-import { AppColors } from '../../constants/colors';
+import { useAuthStore } from '../../../store/authStore';
+import { AppColors } from '../../../constants/colors';
 import { Octicons } from '@expo/vector-icons';
 
 const ProfileScreen = () => {

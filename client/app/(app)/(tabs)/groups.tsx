@@ -4,7 +4,7 @@ import { View, Text, FlatList, Pressable, TextInput, StatusBar, ActivityIndicato
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../../constants/colors';
 import { router } from 'expo-router';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '../../../store/authStore';
 import { useMessageStore, Chat } from '../../../store/messageStore';
 import { chatApi } from '../../../api';
 import { GroupChatItem } from '../../../components/chat/ChatItem';
@@ -27,11 +27,11 @@ export default function GroupsScreen() {
         const chats = response.data;
         
         // Filter only group chats
-        const groups = chats.filter(chat => chat.type === 'group');
+        const groups = chats.filter((chat: any) => chat.type === 'group');
         setGroupChats(groups);
         
         // Add to store
-        groups.forEach(chat => addChat(chat));
+        groups.forEach((chat: any) => addChat(chat));
         
         setError(null);
       } catch (err) {
@@ -80,7 +80,7 @@ export default function GroupsScreen() {
           placeholder="جستجو در گروه‌ها..."
           placeholderTextColor={AppColors.textMuted}
           value={searchText}
-          onChangeText={handleSearch}
+          onChangeText={setSearchText}
           style={{
             color: AppColors.textPrimary,
             fontSize: 16,
@@ -112,7 +112,7 @@ export default function GroupsScreen() {
       <StatusBar backgroundColor={AppColors.primary} barStyle="light-content" />
       
       <FlatList
-        data={filteredGroups}
+        data={filteredGroups ? filteredGroups : groupChats}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <GroupChatItem 

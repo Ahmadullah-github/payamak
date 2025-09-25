@@ -1,9 +1,7 @@
 // File: client/store/socketStore.ts - Updated for new chat system
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
-
-// Socket URL - should match your server
-const SOCKET_URL = 'http://localhost:3000';
+import { SOCKET_URL_DEVICE }  from '../config';
 
 interface SocketState {
   socket: Socket | null;
@@ -33,9 +31,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
   connect: (token) => {
     if (get().socket) return; // already connected
 
-    const newSocket = io(SOCKET_URL, {
+    console.log('🔌 Connecting to socket:', SOCKET_URL_DEVICE);
+    const newSocket = io(SOCKET_URL_DEVICE, {
       auth: { token },
       transports: ['websocket'],
+      timeout: 20000,
     });
 
     newSocket.on('connect', () => {
@@ -43,9 +43,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       set({ isConnected: true });
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('❌ Socket disconnected!');
+    newSocket.on('disconnect', (reason) => {
+      console.log('❌ Socket disconnected!', reason);
       set({ isConnected: false, onlineUsers: new Set() });
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error);
+      set({ isConnected: false });
     });
 
     // --- SERVER EVENTS ---

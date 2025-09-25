@@ -1,4 +1,3 @@
-// File: app/(app)/chat/[id].tsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -9,25 +8,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { AppColors } from '../../../constants/colors';
 import { useAuthStore } from '../../../store/authStore';
 import { useSocketStore } from '../../../store/socketStore';
 import { useMessageStore, ChatMessage, Chat } from '../../../store/messageStore';
-import { chatApi } from '../../../api';
-import MessageBubble, { TypingIndicator } from '../../../components/chat/MessageBubble';
-import { DirectChatHeader, GroupChatHeader, OnlineMembersIndicator } from '../../../components/chat/ChatHeader';
-
-interface ChatScreenProps {
-  // The component will receive chatId and type from params
-}
+import { chatApi, userApi } from '../../../api';
+import MessageBubble from '../../../components/chat/MessageBubble';
+import { useToast } from '../../../hooks/useToast';
+import { Toast } from '../../../components/ui';
 
 export default function ChatScreen() {
-  const { id: chatId, type } = useLocalSearchParams<{ id: string; type?: string }>();
+  const { id: chatId, type: chatType } = useLocalSearchParams<{ id: string; type?: string }>();
   const { user: currentUser } = useAuthStore();
-  const { socket, onlineUsers, sendMessage: socketSendMessage, joinChatRoom } = useSocketStore();
+  const { socket, onlineUsers, joinChatRoom, leaveChatRoom } = useSocketStore();
   
   const { 
     getMessagesForChat, 
@@ -39,53 +37,230 @@ export default function ChatScreen() {
     setActiveChat
   } = useMessageStore();
   
-  const messages = chatId ? getMessagesForChat(chatId) : [];
-  const chat = chatId ? getChat(chatId) : null;
+  // Local state
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [chatData, setChatData] = useState<Chat | null>(null);
+  const [otherUser, setOtherUser] = useState<any>(null);
   const flatListRef = useRef<FlatList>(null);
+  const { toast, showError, hideToast } = useToast();
 
-  const isGroupChat = chat?.type === 'group' || type === 'group';
+  const messages = chatId ? getMessagesForChat(chatId) : [];
+  const isGroupChat = chatType === 'group' || chatData?.type === 'group';
 
   // Set active chat
   useEffect(() => {
     if (chatId) {
       setActiveChat(chatId);
     }
-    return () => setActiveChat(null);
-  }, [chatId, setActiveChat]);
-
-  // Join chat room when component mounts
-  useEffect(() => {
-    if (currentUser && chatUserId && socket) {
-      joinChatRoom(currentUser.id.toString(), chatUserId);
-    }
-  }, [currentUser, chatUserId, socket, joinChatRoom]);
-
-  // Mock chat user data (in real app, fetch from API)
-  useEffect(() => {
-    // This should be fetched from your API based on chatUserId
-    const mockChatUser: ChatUser = {
-      id: chatUserId || '1',
-      name: chatUserId === '1' ? 'احمد ولی' : 'فاطمه رضایی',
-      avatarUrl: `https://i.pravatar.cc/150?u=${chatUserId}`,
-      isOnline: onlineUsers.has(chatUserId || ''),
+    return () => {
+      setActiveChat(null);
+      // Leave chat room when component unmounts
+      if (socket && chatData?.id && !chatData.id.startsWith('new-')) {
+        leaveChatRoom(chatData.id);
+        console.log('📬 Left chat room:', chatData.id);
+      }
     };
-    setChatUser(mockChatUser);
-  }, [chatUserId, onlineUsers]);
+  }, [chatId, setActiveChat, socket, chatData?.id, leaveChatRoom]);
 
-  // Socket event listeners
+  // Load chat data and messages
   useEffect(() => {
-    if (!socket) return;
+    if (!chatId || !currentUser) return;
 
-    // Listen for incoming messages
-    const handleNewMessage = (message: MessageType) => {
-      // Only add message if it's for this chat
-      const messageChatId = generateChatId(message.senderId, message.receiverId);
-      if (messageChatId === chatId) {
-        addMessage(chatId, message);
+    const loadChatData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Check if chat exists in store first
+        let chat = getChat(chatId);
+        
+        if (!chat) {
+          // If it's a direct user chat (numeric ID), we need to create/find the chat
+          if (!isNaN(Number(chatId))) {
+            try {
+              // Get the other user's info first
+              console.log('👥 Getting user info for:', chatId);
+              const userResponse = await userApi.getUser(chatId);
+              const userData = userResponse.data;
+              setOtherUser(userData);
+              console.log('✅ User data loaded:', userData.fullName);
+
+              // Try to find existing chat first
+              console.log('🔍 Searching for existing chat...');
+              const chatsResponse = await chatApi.getChats();
+              const existingChat = chatsResponse.data.find((c: any) => {
+                // For private chats, check if the other user is a member
+                if (c.type === 'private') {
+                  return c.members?.some((m: any) => m.id.toString() === chatId) || 
+                         c.participants?.some((p: any) => p.id.toString() === chatId) ||
+                         c.otherUserId?.toString() === chatId;
+                }
+                return false;
+              });
+
+              if (existingChat) {
+                console.log('✅ Found existing chat:', existingChat.id);
+                chat = existingChat;
+                addChat(existingChat);
+                // Load messages for existing chat
+                await loadMessages(existingChat.id);
+              } else {
+                console.log('🆕 No existing chat found. Will create when sending first message.');
+                // Create a temporary chat object for UI purposes
+                chat = {
+                  id: `new-${chatId}`,
+                  type: 'private' as const,
+                  name: userData.fullName,
+                  lastMessage: '',
+                  lastMessageTime: undefined,
+                  unreadCount: 0,
+                  isOnline: onlineUsers.has(chatId)
+                };
+                console.log('✅ Created temporary chat object');
+              }
+            } catch (err: any) {
+              console.error('❌ Error handling user chat:', err);
+              // Even if we can't get user info, allow the chat interface
+              setOtherUser({ id: chatId, fullName: 'User', username: 'user' });
+              chat = {
+                id: `new-${chatId}`,
+                type: 'private' as const,
+                name: 'User',
+                lastMessage: '',
+                lastMessageTime: undefined,
+                unreadCount: 0,
+                isOnline: false
+              };
+              console.log('⚠️ Using fallback chat object');
+            }
+          } else {
+            // It's a group chat or existing chat ID
+            try {
+              const chatsResponse = await chatApi.getChats();
+              chat = chatsResponse.data.find((c: any) => c.id === chatId);
+              if (chat) {
+                addChat(chat);
+                await loadMessages(chat.id);
+              } else {
+                setError('Chat not found');
+                return;
+              }
+            } catch (err: any) {
+              console.error('Error loading chat:', err);
+              setError('Failed to load chat');
+              return;
+            }
+          }
+        } else {
+          // Chat exists in store, load messages
+          if (!chat.id.startsWith('new-')) {
+            await loadMessages(chat.id);
+          }
+        }
+
+        // Check if we successfully got chat data
+        if (!chat) {
+          setError('Unable to load or create chat');
+          return;
+        }
+
+        setChatData(chat);
+        console.log('✅ Chat data set:', chat.name);
+        
+        // Join the chat room for real-time messaging
+        if (socket && chat.id && !chat.id.startsWith('new-')) {
+          joinChatRoom(chat.id);
+          console.log('📬 Joined chat room:', chat.id);
+        }
+
+      } catch (err: any) {
+        console.error('Error in loadChatData:', err);
+        setError(err.response?.data?.error || 'Failed to load chat');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadChatData();
+  }, [chatId, currentUser]);
+
+  // Load messages function
+  const loadMessages = async (realChatId: string) => {
+    try {
+      setLoadingMessages(true);
+      console.log('📬 Loading messages for chat:', realChatId);
+      
+      const response = await chatApi.getChatMessages(realChatId);
+      // Handle API response format: { success: true, messages: [...] }
+      const messagesData = response.data?.messages || response.data || [];
+      console.log(`✅ Loaded ${messagesData.length} messages`);
+      
+      // Ensure messagesData is an array
+      if (!Array.isArray(messagesData)) {
+        console.warn('⚠️ Messages data is not an array:', messagesData);
+        setChatMessages(realChatId, []);
+        return;
+      }
+      
+      // Transform API response to ChatMessage format
+      const transformedMessages: ChatMessage[] = messagesData.map((msg: any) => ({
+        id: msg.id.toString(),
+        chatId: realChatId,
+        senderId: msg.senderId.toString(),
+        senderName: msg.senderName || msg.sender?.fullName || 'Unknown',
+        content: msg.content,
+        timestamp: new Date(msg.timestamp),
+        status: msg.status || 'sent',
+        type: msg.type || 'text',
+        mediaFile: msg.media ? {
+          id: msg.media.id,
+          filename: msg.media.filename,
+          url: msg.media.url,
+          mimeType: msg.media.mimeType,
+          size: msg.media.size,
+        } : undefined,
+      }));
+
+      setChatMessages(realChatId, transformedMessages);
+    } catch (err: any) {
+      console.error('❌ Error loading messages:', err);
+      // For new chats or empty chats, 404 is expected
+      if (err.response?.status === 404) {
+        console.log('📬 No messages found - this is a new chat');
+        setChatMessages(realChatId, []); // Set empty messages array
+      } else {
+        console.error('Unexpected error loading messages:', err.response?.data || err.message);
+        // Always set empty array on any error to prevent crashes
+        setChatMessages(realChatId, []);
+      }
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  // Socket event listeners for real-time messages
+  useEffect(() => {
+    if (!socket || !chatData) return;
+
+    const handleNewMessage = (messageData: any) => {
+      // Check if message belongs to current chat
+      if (messageData.chatId === chatData.id || messageData.chatId === chatId) {
+        const newMessage: ChatMessage = {
+          id: messageData.id.toString(),
+          chatId: chatData.id,
+          senderId: messageData.senderId.toString(),
+          senderName: messageData.senderName || 'Unknown',
+          content: messageData.content,
+          timestamp: new Date(messageData.timestamp),
+          status: 'delivered',
+          type: messageData.type || 'text',
+        };
+
+        addMessage(chatData.id, newMessage);
+        
         // Auto-scroll to bottom
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
@@ -93,7 +268,6 @@ export default function ChatScreen() {
       }
     };
 
-    // Listen for message status updates
     const handleMessageStatusUpdate = (data: { messageId: string; status: 'delivered' | 'read' }) => {
       updateMessageStatus(data.messageId, data.status);
     };
@@ -105,144 +279,158 @@ export default function ChatScreen() {
       socket.off('new_message', handleNewMessage);
       socket.off('message_status_update', handleMessageStatusUpdate);
     };
-  }, [socket, chatId, addMessage, updateMessageStatus]);
+  }, [socket, chatData, chatId, addMessage, updateMessageStatus]);
 
-  // Load chat history (mock data for now)
-  useEffect(() => {
-    if (!chatId) return;
-    
-    // In real app, fetch from API
-    const mockMessages: MessageType[] = [
-      {
-        id: '1',
-        senderId: chatUserId || '1',
-        receiverId: currentUser?.id.toString() || '2',
-        content: 'سلام، چطوری؟',
-        timestamp: new Date(Date.now() - 3600000),
-        status: 'read',
-        type: 'text',
-      },
-      {
-        id: '2',
-        senderId: currentUser?.id.toString() || '2',
-        receiverId: chatUserId || '1',
-        content: 'سلام، ممنون. تو چطوری؟',
-        timestamp: new Date(Date.now() - 3000000),
-        status: 'delivered',
-        type: 'text',
-      },
-      {
-        id: '3',
-        senderId: chatUserId || '1',
-        receiverId: currentUser?.id.toString() || '2',
-        content: 'عالی! فردا جلسه داریم، ساعت چند مناسبه؟',
-        timestamp: new Date(Date.now() - 1800000),
-        status: 'read',
-        type: 'text',
-      },
-    ];
-    setChatMessages(chatId, mockMessages);
-  }, [chatId, chatUserId, currentUser, setChatMessages]);
+  // Send message function
+  const sendMessage = async () => {
+    if (!inputText.trim() || !currentUser) return;
 
-  const sendMessage = () => {
-    if (!inputText.trim() || !currentUser || !chatUser || !chatId) return;
-
-    const newMessage: MessageType = {
-      id: Date.now().toString(),
-      senderId: currentUser.id.toString(),
-      receiverId: chatUser.id,
-      content: inputText.trim(),
-      timestamp: new Date(),
-      status: 'sent',
-      type: 'text',
-    };
-
-    // Add message to local state immediately
-    addMessage(chatId, newMessage);
+    const messageContent = inputText.trim();
     setInputText('');
 
-    // Send to server via socket
-    socketSendMessage(chatUser.id, newMessage.content, 'text');
+    try {
+      let actualChatId = chatData?.id;
+      
+      // If it's a new chat (starts with 'new-'), create the real chat first
+      if (chatData?.id.startsWith('new-')) {
+        console.log('⚡ Creating real chat for new conversation...');
+        try {
+          const newChatResponse = await chatApi.createChat('private', undefined, [chatId]);
+          const realChat = newChatResponse.data;
+          if (realChat) {
+            actualChatId = realChat.id;
+            // Update the chat data
+            setChatData(realChat);
+            addChat(realChat);
+            console.log('✅ Real chat created:', realChat.id);
+          }
+        } catch (createError: any) {
+          console.error('❌ Failed to create chat:', createError);
+          // Try to send message anyway - backend might handle chat creation
+          console.log('🔄 Attempting to send message without explicit chat creation...');
+        }
+      }
+      
+      // Use original chatId if we couldn't create a proper chat
+      if (!actualChatId || actualChatId.startsWith('new-')) {
+        console.log('📬 Sending message directly to user:', chatId);
+        // For direct user messaging, we can try using the user ID
+        actualChatId = chatId;
+      }
 
-    // Auto-scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      console.log('📬 Sending message to chat/user:', actualChatId);
+      
+      // Send via API
+      const response = await chatApi.sendMessage(actualChatId, messageContent, 'text');
+      // Handle API response format: { success: true, message: {...} }
+      const messageData = response.data?.message || response.data;
+      console.log('✅ Message sent successfully:', messageData?.id || 'no id');
+
+      // Create local message
+      const newMessage: ChatMessage = {
+        id: messageData?.id?.toString() || Date.now().toString(),
+        chatId: actualChatId,
+        senderId: currentUser.id.toString(),
+        senderName: currentUser.fullName,
+        content: messageContent,
+        timestamp: new Date(),
+        status: 'sent',
+        type: 'text',
+      };
+
+      // Add to local state
+      addMessage(actualChatId, newMessage);
+
+      // Send via socket for real-time delivery
+      if (socket) {
+        socket.emit('send_message', {
+          chatId: actualChatId,
+          content: messageContent,
+          type: 'text',
+          receiverId: otherUser?.id || chatId, // Include receiver for direct messaging
+        });
+        console.log('📡 Message emitted to socket for real-time delivery');
+      }
+
+      // Auto-scroll to bottom
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+
+    } catch (err: any) {
+      console.error('❌ Error sending message:', err);
+      showError('Failed to send message. Please try again.');
+      // Restore input text on error
+      setInputText(messageContent);
+    }
   };
 
-  const renderMessage = ({ item: message }: { item: MessageType }) => {
+  const renderMessage = ({ item: message }: { item: ChatMessage }) => {
     const isMyMessage = message.senderId === currentUser?.id.toString();
-    const messageTime = new Date(message.timestamp).toLocaleTimeString('fa-IR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
+    
     return (
-      <View
-        className={`flex-row mb-1 px-2 ${isMyMessage ? 'justify-end' : 'justify-start'}`}
-        style={{ marginBottom: 4 }}
-      >
-        <View
-          className={`max-w-[80%] rounded-lg px-3 py-2 ${
-            isMyMessage
-              ? 'rounded-br-sm'
-              : 'rounded-bl-sm'
-          }`}
-          style={{
-            backgroundColor: isMyMessage ? AppColors.messageSent : AppColors.messageReceived,
-            elevation: 1,
-            shadowColor: AppColors.shadow,
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-          }}
-        >
-          <Text
-            className="text-base leading-5"
-            style={{
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              lineHeight: 20,
-              textAlign: 'right',
-            }}
-          >
-            {message.content}
-          </Text>
-          <View className={`flex-row items-center justify-end mt-1`}>
-            <Text
-              className="text-xs"
-              style={{
-                color: AppColors.textMuted,
-                fontSize: 11,
-                marginRight: isMyMessage ? 4 : 0,
-              }}
-            >
-              {messageTime}
-            </Text>
-            {isMyMessage && (
-              <View>
-                {message.status === 'read' && (
-                  <Ionicons name="checkmark-done" size={16} color={AppColors.accent} />
-                )}
-                {message.status === 'delivered' && (
-                  <Ionicons name="checkmark-done" size={16} color={AppColors.textMuted} />
-                )}
-                {message.status === 'sent' && (
-                  <Ionicons name="checkmark" size={16} color={AppColors.textMuted} />
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-      </View>
+      <MessageBubble
+        message={message}
+        isMyMessage={isMyMessage}
+        showSenderName={isGroupChat && !isMyMessage}
+        isGroupChat={isGroupChat}
+        onLongPress={() => {
+          // Handle message options
+          console.log('Message options for:', message.id);
+        }}
+        onSenderPress={(senderId) => {
+          // Navigate to sender profile
+          console.log('View profile of:', senderId);
+        }}
+      />
     );
   };
 
-  if (!chatUser) {
+  // Chat header component
+  const getChatTitle = () => {
+    if (isGroupChat) {
+      return chatData?.name || 'Group Chat';
+    }
+    return otherUser?.fullName || chatData?.name || 'Chat';
+  };
+
+  const getChatSubtitle = () => {
+    if (isGroupChat) {
+      const memberCount = chatData?.members?.length || 0;
+      return `${memberCount} عضو`;
+    }
+    const isOnline = otherUser?.id ? onlineUsers.has(otherUser.id.toString()) : false;
+    return isOnline ? 'آنلاین' : 'آفلاین';
+  };
+
+  // Loading state
+  if (loading) {
     return (
       <View className="flex-1 justify-center items-center" style={{ backgroundColor: AppColors.chatBackground }}>
         <StatusBar backgroundColor={AppColors.primary} barStyle="light-content" />
-        <Text style={{ color: AppColors.textMuted }}>Loading...</Text>
+        <ActivityIndicator size="large" color={AppColors.primary} />
+        <Text style={{ color: AppColors.textMuted, marginTop: 8 }}>Loading chat...</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: AppColors.chatBackground }}>
+        <StatusBar backgroundColor={AppColors.primary} barStyle="light-content" />
+        <Text style={{ color: AppColors.error, marginBottom: 16 }}>{error}</Text>
+        <Pressable
+          onPress={() => router.back()}
+          style={{
+            backgroundColor: AppColors.primary,
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: AppColors.textWhite }}>Go Back</Text>
+        </Pressable>
       </View>
     );
   }
@@ -259,18 +447,22 @@ export default function ChatScreen() {
               <Pressable 
                 className="flex-row items-center flex-1"
                 onPress={() => {
-                  // Navigate to user profile
+                  // Navigate to user/group profile
+                  console.log('Navigate to profile');
                 }}
               >
                 <Image
-                  source={{ uri: chatUser.avatarUrl }}
+                  source={{ 
+                    uri: isGroupChat 
+                      ? `https://i.pravatar.cc/150?u=group${chatData?.id}` 
+                      : `https://i.pravatar.cc/150?u=${otherUser?.id || chatId}`
+                  }}
                   className="w-10 h-10 rounded-full mr-3"
+                  style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
                 />
                 <View className="flex-1">
-                  <Text className="text-lg font-semibold text-white">{chatUser.name}</Text>
-                  <Text className="text-xs text-blue-100">
-                    {chatUser.isOnline ? 'آنلاین' : 'آفلاین'}
-                  </Text>
+                  <Text className="text-lg font-semibold text-white">{getChatTitle()}</Text>
+                  <Text className="text-xs text-blue-100">{getChatSubtitle()}</Text>
                 </View>
               </Pressable>
             ),
@@ -278,6 +470,7 @@ export default function ChatScreen() {
               <Pressable 
                 onPress={() => router.back()}
                 className="flex-row items-center mr-2"
+                style={{ marginRight: 8, padding: 8 }}
               >
                 <Ionicons name="arrow-back" size={24} color="white" />
               </Pressable>
@@ -318,6 +511,51 @@ export default function ChatScreen() {
             }}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={() => (
+              <View className="flex-1 justify-center items-center" style={{ paddingTop: 100 }}>
+                {loadingMessages ? (
+                  <>
+                    <ActivityIndicator size="large" color={AppColors.primary} />
+                    <Text style={{ color: AppColors.textMuted, marginTop: 8 }}>Loading messages...</Text>
+                  </>
+                ) : (
+                  <>
+                    <View style={{
+                      width: 100,
+                      height: 100,
+                      borderRadius: 50,
+                      backgroundColor: 'rgba(37, 211, 102, 0.1)',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginBottom: 20,
+                    }}>
+                      <Ionicons name="chatbubbles" size={48} color="#25D366" />
+                    </View>
+                    <Text style={{ 
+                      color: AppColors.textPrimary, 
+                      fontSize: 18,
+                      fontWeight: '600',
+                      marginBottom: 8,
+                      textAlign: 'center' 
+                    }}>
+                      Start Your Conversation
+                    </Text>
+                    <Text style={{ 
+                      color: AppColors.textMuted, 
+                      fontSize: 14,
+                      textAlign: 'center',
+                      paddingHorizontal: 40,
+                      lineHeight: 20
+                    }}>
+                      {isGroupChat 
+                        ? 'Send your first message to this group!'
+                        : `Send your first message to ${getChatTitle()}. Even if they're offline, they'll get it when they come back online.`
+                      }
+                    </Text>
+                  </>
+                )}
+              </View>
+            )}
           />
 
           {/* Message Input */}
@@ -389,6 +627,15 @@ export default function ChatScreen() {
           </View>
         </KeyboardAvoidingView>
       </View>
+      
+      {/* Toast */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        position="top"
+      />
     </>
   );
 }

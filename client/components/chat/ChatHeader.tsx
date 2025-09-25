@@ -40,7 +40,7 @@ export function DirectChatHeader({
   };
 
   return (
-    <View className="flex-row items-center px-4 py-2\" style={{ backgroundColor: AppColors.primary }}>
+    <View className="flex-row items-center px-4 py-2" style={{ backgroundColor: AppColors.primary }}>
       {/* Back Button */}
       <Pressable 
         onPress={handleBackPress}
@@ -69,9 +69,9 @@ export function DirectChatHeader({
       </Pressable>
 
       {/* Action Buttons */}
-      <View className="flex-row items-center\">
+      <View className="flex-row items-center">
         <Pressable 
-          className="p-2 mr-2\"
+          className="p-2 mr-2"
           onPress={onVideoCallPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
         >
@@ -85,7 +85,7 @@ export function DirectChatHeader({
           <Ionicons name="call" size={24} color="white" />
         </Pressable>
         <Pressable 
-          className="p-2\"
+          className="p-2"
           onPress={handleInfoPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
         >
@@ -139,7 +139,7 @@ export function GroupChatHeader({
       {/* Back Button */}
       <Pressable 
         onPress={handleBackPress}
-        className="mr-3 p-2\"
+        className="mr-3 p-2"
         style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
       >
         <Ionicons name="arrow-back" size={24} color="white" />
@@ -147,18 +147,18 @@ export function GroupChatHeader({
 
       {/* Group Info */}
       <Pressable 
-        className="flex-row items-center flex-1\"
+        className="flex-row items-center flex-1"
         onPress={handleInfoPress}
         style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
       >
-        <View className="relative mr-3\">
+        <View className="relative mr-3">
           <Image
             source={{ uri: `https://i.pravatar.cc/150?u=group${chat.id}` }}
-            className="w-10 h-10 rounded-full\"
+            className="w-10 h-10 rounded-full"
           />
           {/* Group indicator */}
           <View 
-            className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full justify-center items-center\"
+            className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full justify-center items-center"
             style={{
               backgroundColor: AppColors.primary,
               borderWidth: 1,
@@ -168,34 +168,34 @@ export function GroupChatHeader({
             <Ionicons name="people" size={8} color="white" />
           </View>
         </View>
-        <View className="flex-1\">
-          <Text className="text-lg font-semibold text-white\" numberOfLines={1}>
+        <View className="flex-1">
+          <Text className="text-lg font-semibold text-white" numberOfLines={1}>
             {chat.name}
           </Text>
-          <Text className="text-xs text-blue-100\">
+          <Text className="text-xs text-blue-100">
             {getStatusText()}
           </Text>
         </View>
       </Pressable>
 
       {/* Action Buttons */}
-      <View className="flex-row items-center\">
+      <View className="flex-row items-center">
         <Pressable 
-          className="p-2 mr-2\"
+          className="p-2 mr-2"
           onPress={onVideoCallPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
         >
           <Ionicons name="videocam" size={24} color="white" />
         </Pressable>
         <Pressable 
-          className="p-2 mr-2\"
+          className="p-2 mr-2"
           onPress={onCallPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
         >
           <Ionicons name="call" size={24} color="white" />
         </Pressable>
         <Pressable 
-          className="p-2\"
+          className="p-2"
           onPress={handleInfoPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
         >
@@ -214,19 +214,19 @@ export function OnlineMembersIndicator({ members }: { members: ChatMember[] }) {
 
   return (
     <View 
-      className="mx-4 mb-2 px-3 py-2 rounded-lg\"
+      className="mx-4 mb-2 px-3 py-2 rounded-lg"
       style={{ backgroundColor: 'rgba(76, 175, 80, 0.1)' }}
     >
-      <View className="flex-row items-center\">
+      <View className="flex-row items-center">
         <Ionicons name="radio-button-on" size={12} color={AppColors.online} />
         <Text 
-          className="mr-2 text-sm\"
+          className="mr-2 text-sm"
           style={{ color: AppColors.online }}
         >
           آنلاین: 
         </Text>
         <Text 
-          className="flex-1 text-sm\"
+          className="flex-1 text-sm"
           style={{ color: AppColors.textPrimary }}
           numberOfLines={1}
         >

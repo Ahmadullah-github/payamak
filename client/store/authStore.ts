@@ -9,6 +9,9 @@ interface User {
   id: number;
   username: string;
   fullName: string;
+  status?: string;
+  createdAt?: string;
+  avatarUrl?: string;
 }
 
 interface AuthState {
@@ -20,6 +23,7 @@ interface AuthState {
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
   updateUserProfile: (newUserData: Partial<User>) => void;
+  refreshProfile: () => Promise<void>;
 }
 
 // 👇 Extracted for reuse and to avoid `get()` recursion
@@ -43,17 +47,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initializeAuth: async () => {
     try {
       const storedToken = await SecureStore.getItemAsync('authToken');
-      console.log('Initializing auth with stored token:', !!storedToken);
+      console.log('🔐 Initializing auth with stored token:', !!storedToken);
 
       if (storedToken) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
         const response = await axios.get(`${API_URL}/auth/profile`);
-
-        set({ token: storedToken, user: response.data });
+        
+        // Handle the enhanced response structure
+        const userData = response.data.success ? response.data.user : response.data;
+        
+        set({ token: storedToken, user: userData });
         useSocketStore.getState().connect(storedToken);
+        console.log('✅ Auth initialized successfully');
       }
-    } catch (error) {
-      console.warn('Auth initialization failed. Logging out.', error);
+    } catch (error: any) {
+      console.warn('⚠️ Auth initialization failed. Logging out.', error.response?.data || error.message);
       await clearSession(set);
     } finally {
       set({ isLoading: false });
@@ -63,32 +71,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (username, password) => {
     try {
       const response = await axios.post(`${API_URL}/auth/login`, { username, password });
-      const { token: newToken, user: userData } = response.data;
+      
+      // Handle the enhanced response structure
+      const responseData = response.data;
+      const newToken = responseData.token;
+      const userData = responseData.user;
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       await SecureStore.setItemAsync('authToken', newToken);
 
       set({ token: newToken, user: userData });
       useSocketStore.getState().connect(newToken);
-
+      
+      console.log('✅ Login successful');
       return { success: true };
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Login failed';
+      const message = error.response?.data?.error || error.response?.data?.message || 'Login failed';
+      console.error('❌ Login failed:', message);
       return { success: false, message };
     }
   },
 
   register: async (username, password, fullName) => {
     try {
-      // Optional: Handle auto-login if your API returns token+user
       const response = await axios.post(`${API_URL}/auth/register`, { username, password, fullName });
-      // If you want to auto-login:
-      // const { token, user } = response.data;
-      // ... same as login logic
-
+      console.log('✅ Registration successful');
       return { success: true };
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Registration failed';
+      const message = error.response?.data?.error || error.response?.data?.message || 'Registration failed';
+      console.error('❌ Registration failed:', message);
       return { success: false, message };
     }
   },
@@ -97,6 +108,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set((state) => ({
       user: state.user ? { ...state.user, ...newUserData } : null,
     }));
+  },
+
+  refreshProfile: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/auth/profile`);
+      const userData = response.data.success ? response.data.user : response.data;
+      
+      set((state) => ({
+        user: userData,
+      }));
+    } catch (error: any) {
+      console.error('Failed to refresh profile:', error.response?.data || error.message);
+    }
   },
 }));
 

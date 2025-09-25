@@ -1,219 +1,70 @@
 // File: client/app/(app)/_layout.tsx
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Pressable, Modal, Animated, BackHandler } from 'react-native';
-import { Stack, Tabs } from 'expo-router';
+import React from 'react';
+import { Stack } from 'expo-router'; // Change from Tabs to Stack
 import { Ionicons, Octicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/colors';
-import AppDrawer from '../../components/AppDrawer';
+
 
 export default function AppLayout() {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  const openDrawer = () => {
-    setIsDrawerOpen(true);
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const closeDrawer = () => {
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setIsDrawerOpen(false);
-    });
-  };
-
-  // Handle Android back button
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (isDrawerOpen) {
-        closeDrawer();
-        return true;
-      }
-      return false;
-    });
-
-    return () => backHandler.remove();
-  }, [isDrawerOpen]);
-
+ 
   return (
-    <>
-      <Tabs
+      <>
+        <Stack
         screenOptions={{
-          tabBarActiveTintColor: AppColors.tabActive,
-          tabBarInactiveTintColor: AppColors.tabInactive,
-          tabBarStyle: {
-            backgroundColor: AppColors.tabBar,
-            height: 60,
-            paddingBottom: 8,
-            paddingTop: 8,
-            borderTopWidth: 0,
-            elevation: 8,
-            shadowColor: AppColors.shadow,
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-          },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '600',
-            marginTop: 4,
-          },
           headerStyle: {
-            backgroundColor: AppColors.primary,
-            elevation: 4,
-            shadowColor: AppColors.shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
+            backgroundColor: `${AppColors.primary}`,
           },
           headerTintColor: AppColors.textWhite,
           headerTitleStyle: {
             fontWeight: '600',
             fontSize: 20,
-            direction: 'rtl',
-            },
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 18 }}>
-              <Pressable
-                onPress={openDrawer}
-                style={({ pressed }) => ({
-                  padding: 8,
-                  marginRight: 8,
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Octicons name="three-bars" size={22} color={AppColors.textWhite} />
-              </Pressable>
-            </View>
-          ),
+          },
         }}
       >
-        <Tabs.Screen 
-          name="(tabs)/index" 
+        {/* Tabs as main screen */}
+        <Stack.Screen 
+          name="(tabs)" 
           options={{ 
-            title: 'چت‌ها',
-            headerTitleAlign: 'center',
-            tabBarIcon: ({ color, size, focused }) => (
-              <Ionicons 
-                name={focused ? 'chatbubbles' : 'chatbubbles-outline'} 
-                size={size} 
-                color={color} 
-              />
-            ),
+            headerShown: false, // Tabs handle their own header
           }} 
         />
-        <Tabs.Screen 
-          name="(tabs)/groups" 
-          options={{ 
-            title: 'گروه‌ها',
-            headerTitleAlign: 'center',
-            tabBarIcon: ({ color, size, focused }) => (
-              <Ionicons 
-                name={focused ? 'people' : 'people-outline'} 
-                size={size} 
-                color={color} 
-              />
-            ),
-          }} 
-        />
-        <Tabs.Screen 
-          name="profile" 
-          options={{
-            href: null,
-          }} 
-        />
-        <Tabs.Screen 
-          name="settings" 
-          options={{
-            href: null,
-          }} 
-        />
-        <Tabs.Screen 
-          name="about" 
-          options={{
-            href: null,
-          }} 
-        />
-        <Tabs.Screen 
+        
+        {/* Chat screens */}
+        <Stack.Screen 
           name="chat/[id]" 
           options={{
-            href: null,
-            tabBarHideOnKeyboard: true,
-            tabBarStyle: {
-              display: 'none',
-            }
+            title: 'چت',
+            headerShown: true,
           }} 
         />
-        <Tabs.Screen 
+
+        
+        {/* Other screens accessible via drawer */}
+        <Stack.Screen 
+          name="profile/index" 
+          options={{
+            title: 'پروفایل',
+          }} 
+        />
+        <Stack.Screen 
           name="profile/edit" 
           options={{
-            href: null,
+            title: 'ویرایش پروفایل',
           }} 
         />
-      </Tabs>
-
-      {/* Drawer Modal */}
-      <Modal
-        visible={isDrawerOpen}
-        transparent
-        animationType="none"
-        onRequestClose={closeDrawer}
-        statusBarTranslucent
-        
-        
-      >
-        <Animated.View
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            opacity: fadeAnim,
-          }}
-        >
-          {/* Backdrop */}
-          <Pressable
-            style={{ flex: 1, marginRight: 14, marginVertical: 14 }}
-            onPress={closeDrawer}
-          />
-          
-          {/* Drawer */}
-          <Animated.View
-            style={{
-              transform: [{
-                translateX: slideAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [300, 0], // Slide from right
-                }),
-              }],
-              
-            }}
-          >
-            <AppDrawer onClose={closeDrawer} />
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+        <Stack.Screen 
+          name="settings" 
+          options={{
+            title: 'تنظیمات',
+          }} 
+        />
+        <Stack.Screen 
+          name="about" 
+          options={{
+            title: 'درباره',
+          }} 
+        />
+      </Stack>
     </>
   );
 }

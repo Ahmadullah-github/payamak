@@ -1,26 +1,38 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import React, { useState } from 'react';
 import { Stack, router } from 'expo-router';
 import { useAuthStore } from '../../../store/authStore';
 import { AppColors } from '../../../constants/colors';
 import axios from 'axios';
 import { API_URL } from '../../../config';
+import { useToast } from '../../../hooks/useToast';
+import { Toast, LoadingButton } from '../../../components/ui';
 
 const EditProfileScreen = () => {
   const { user, isLoading, updateUserProfile } = useAuthStore();
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [isSaving, setIsSaving] = useState(false);
+  const { toast, showSuccess, showError, hideToast } = useToast();
 
   const handleSaveChanges = async () => {
     if (isSaving) return;
+    
+    if (!fullName.trim()) {
+      showError('Please enter a valid name.');
+      return;
+    }
+    
     setIsSaving(true);
     try {
       const response = await axios.put(`${API_URL}/users`, { fullName });
       updateUserProfile(response.data);
-      router.back();
+      showSuccess('Profile updated successfully!');
+      setTimeout(() => {
+        router.back();
+      }, 1500);
     } catch (error) {
       console.error('Failed to update profile:', error);
-      Alert.alert('Error', 'Could not save your changes. Please try again.');
+      showError('Could not save your changes. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -48,13 +60,22 @@ const EditProfileScreen = () => {
         />
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSaveChanges} disabled={isSaving}>
-        {isSaving ? (
-          <ActivityIndicator color={AppColors.textWhite} />
-        ) : (
-          <Text style={styles.buttonText}>ذخیره تغییرات</Text>
-        )}
-      </TouchableOpacity>
+      <LoadingButton
+        title="ذخیره تغییرات"
+        onPress={handleSaveChanges}
+        loading={isSaving}
+        style={styles.button}
+        textStyle={styles.buttonText}
+      />
+      
+      {/* Toast */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+        position="top"
+      />
     </View>
   );
 };

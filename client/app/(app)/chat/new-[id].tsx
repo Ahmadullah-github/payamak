@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { AppColors } from '../../../constants/colors';
 import { useAuthStore } from '../../../store/authStore';
 import { useSocketStore } from '../../../store/socketStore';
@@ -64,7 +64,7 @@ export default function ChatScreen() {
         // Load chat info if not in store
         if (!chat) {
           const chatResponse = await chatApi.getChats();
-          const foundChat = chatResponse.data.find(c => c.id === chatId);
+          const foundChat = chatResponse.data.find((c: any) => c.id === chatId);
           if (foundChat) {
             addChat(foundChat);
           }
@@ -246,7 +246,10 @@ export default function ChatScreen() {
         <Pressable 
           className="mt-4 px-6 py-2 rounded-lg"
           style={{ backgroundColor: AppColors.primary }}
-          onPress={() => window.location.reload()}
+          onPress={() => {
+            // Navigate back instead of reload
+            router.back();
+          }}
         >
           <Text style={{ color: 'white' }}>تلاش مجدد</Text>
         </Pressable>
