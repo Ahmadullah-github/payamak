@@ -1,22 +1,17 @@
 import axios from 'axios';
 import { API_URL } from '../config';
-import { ChatMessage, Chat, ChatMember } from '../store/messageStore';
-import * as SecureStore from 'expo-secure-store';
+import { tokenStorage } from '../utils/tokenStorage';
 
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
 });
 
-// Add auth token to requests
+// Add auth token to requests (platform-safe)
 api.interceptors.request.use(async (config) => {
-  try {
-    const token = await SecureStore.getItemAsync('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  } catch (error) {
-    console.warn('Failed to get auth token:', error);
+  const token = await tokenStorage.getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -28,7 +23,7 @@ api.interceptors.response.use(
     console.error('API Error:', error.response?.data || error.message);
     if (error.response?.status === 401) {
       // Handle unauthorized access
-      SecureStore.deleteItemAsync('authToken');
+      tokenStorage.clearToken();
     }
     return Promise.reject(error);
   }
@@ -105,9 +100,17 @@ export const fileApi = {
   // Delete file
   deleteFile: (fileId: string) => api.delete(`/files/${fileId}`),
   
-  // Get file URL for serving
-  getProfilePictureUrl: (filename: string) => `${API_URL.replace('/api', '')}/api/files/profiles/${filename}`,
-  getMediaFileUrl: (type: string, filename: string) => `${API_URL.replace('/api', '')}/api/files/media/${type}/${filename}`,
+  // Get file URL for serving (robust join)
+  getProfilePictureUrl: (filename: string) => {
+    const base = new URL(API_URL, 'resolve://').toString().replace('resolve://', '');
+    const origin = base.endsWith('/api') ? base.slice(0, -4) : base;
+    return `${origin}/api/files/profiles/${encodeURIComponent(filename)}`;
+  },
+  getMediaFileUrl: (type: string, filename: string) => {
+    const base = new URL(API_URL, 'resolve://').toString().replace('resolve://', '');
+    const origin = base.endsWith('/api') ? base.slice(0, -4) : base;
+    return `${origin}/api/files/media/${encodeURIComponent(type)}/${encodeURIComponent(filename)}`;
+  },
 };
 
 // Notification API endpoints
@@ -153,6 +156,6 @@ export const healthApi = {
 
 // Legacy exports for backward compatibility
 export const getChats = () => chatApi.getChats();
-export const getGroups = () => api.get('/messages/groups'); // This endpoint might need updating on server
+// export const getGroups = () => api.get('/messages/groups');
 
 export default api;

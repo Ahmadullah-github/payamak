@@ -1,21 +1,32 @@
 // File: client/app/(auth)/register.tsx
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  Dimensions,
+} from 'react-native';
 import { useAuthStore } from '../../store/authStore';
 import { useRouter } from 'expo-router';
-import * as React from 'react';
-import { 
-  Text, 
-  View, 
-  StyleSheet, 
-  TextInput, 
-  ScrollView, 
-  KeyboardAvoidingView, 
-  Platform, 
-  Pressable 
-} from 'react-native';
-import { ErrorModal, LoadingButton } from '../../components/ui';
-import { useToast } from '../../hooks/useToast';
-import { Toast } from '../../components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  ErrorModal,
+  Toast,
+  Button,
+  Input,
+  Card,
+  Divider,
+} from '../../components/ui';
+import { useToast } from '../../hooks/useToast';
+import { AppColors } from '../../constants/colors';
+
+const { width, height } = Dimensions.get('window');
 
 interface ValidationErrors {
   fullName?: string;
@@ -25,218 +36,239 @@ interface ValidationErrors {
 }
 
 const Register = () => {
-  const [formData, setFormData] = React.useState({
+  const [formData, setFormData] = useState({
     fullName: '',
     username: '',
     password: '',
     confirmPassword: '',
   });
-  const [loading, setLoading] = React.useState(false);
-  const [errors, setErrors] = React.useState<ValidationErrors>({});
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const [errorModal, setErrorModal] = React.useState({
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [errorModal, setErrorModal] = useState({
     visible: false,
     title: '',
     message: '',
   });
 
-  const { register } = useAuthStore(); 
+  const { register } = useAuthStore();
   const router = useRouter();
   const { toast, showSuccess, showError, hideToast } = useToast();
 
   // Update form data helper
   const updateFormData = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field when user starts typing
     if (errors[field as keyof ValidationErrors]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
-const validateForm = (): ValidationErrors => {
-  const newErrors: ValidationErrors = {};
-  
-  const fullName = formData.fullName.trim();
-  if (!fullName) {
-    newErrors.fullName = 'Full name is required';
-  } else if (fullName.length < 2) {
-    newErrors.fullName = 'Full name must be at least 2 characters';
-  }
-  
-  const username = formData.username.trim();
-  if (!username) {
-    newErrors.username = 'Username is required';
-  } else if (username.length < 3) {
-    newErrors.username = 'Username must be at least 3 characters';
-  } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-    newErrors.username = 'Username can only contain letters, numbers, and underscores';
-  }
-  
-  // Password: do NOT trim
-  if (!formData.password) {
-    newErrors.password = 'Password is required';
-  } else if (formData.password.length < 6) {
-    newErrors.password = 'Password must be at least 6 characters';
-  }
-  
-  if (!formData.confirmPassword) {
-    newErrors.confirmPassword = 'Please confirm your password';
-  } else if (formData.password !== formData.confirmPassword) {
-    newErrors.confirmPassword = 'Passwords do not match';
-  }
-  
-  return newErrors;
-};
+  const validateForm = (): ValidationErrors => {
+    const newErrors: ValidationErrors = {};
 
- const handleRegister = async () => {
-  const validationErrors = validateForm();
-  if (Object.keys(validationErrors).length > 0) {
-    setErrors(validationErrors);
-    return;
-  }
+    const fullName = formData.fullName.trim();
+    if (!fullName) {
+      newErrors.fullName = 'Full name is required';
+    } else if (fullName.length < 2) {
+      newErrors.fullName = 'Full name must be at least 2 characters';
+    }
 
-  setLoading(true);
-  const result = await register(
-    formData.username.trim().toLowerCase(),
-    formData.password,
-    formData.fullName.trim()
-  );
-  setLoading(false);
+    const username = formData.username.trim();
+    if (!username) {
+      newErrors.username = 'Username is required';
+    } else if (username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      newErrors.username =
+        'Username can only contain letters, numbers, and underscores';
+    }
 
-  if (result.success) {
-    showSuccess('Registration successful! You can now log in.');
-    setTimeout(() => router.replace('/'), 1500);
-  } else {
-    setErrorModal({
-      visible: true,
-      title: 'Registration Failed',
-      message: result.message || 'An error occurred during registration.',
-    });
-  }
-};
+    // Password: do NOT trim
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    return newErrors;
+  };
+
+  const handleRegister = async () => {
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    setLoading(true);
+    const result = await register(
+      formData.username.trim().toLowerCase(),
+      formData.password,
+      formData.fullName.trim()
+    );
+    setLoading(false);
+
+    if (result.success) {
+      showSuccess('Registration successful! You can now log in.');
+      setTimeout(() => router.replace('/'), 1500);
+    } else {
+      setErrorModal({
+        visible: true,
+        title: 'Registration Failed',
+        message: result.message || 'An error occurred during registration.',
+      });
+    }
+  };
+
+  const navigateToLogin = () => {
+    router.replace('/');
+  };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <>
+      <StatusBar backgroundColor={AppColors.primary} barStyle="light-content" />
+      <LinearGradient
+        colors={[AppColors.primary, AppColors.primaryLight, AppColors.accent]}
+        style={styles.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join the conversation</Text>
-        </View>
+        <SafeAreaView style={styles.container}>
+          <KeyboardAvoidingView
+            style={styles.keyboardView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Header Section */}
+              <View style={styles.header}>
+                <View style={styles.logoContainer}>
+                  <View style={styles.iconBackground}>
+                    <Ionicons
+                      name="person-add"
+                      size={48}
+                      color={AppColors.textWhite}
+                    />
+                  </View>
+                </View>
+                <Text style={styles.title}>Create Account</Text>
+                <Text style={styles.subtitle}>
+                  Join the conversation and connect with others
+                </Text>
+              </View>
 
-        <View style={styles.form}>
-          {/* Full Name Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-              style={[styles.input, errors.fullName && styles.inputError]}
-              placeholder="Enter your full name"
-              value={formData.fullName}
-              onChangeText={(text) => updateFormData('fullName', text)}
-              autoCapitalize="words"
-            />
-            {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
-          </View>
+              {/* Register Form */}
+              <Card style={styles.formCard} borderRadius="large">
+                <View style={styles.form}>
+                  <Input
+                    label="Full Name"
+                    placeholder="Enter your full name"
+                    value={formData.fullName}
+                    onChangeText={(text) => updateFormData('fullName', text)}
+                    error={errors.fullName}
+                    leftIcon="person-outline"
+                    autoCapitalize="words"
+                    autoComplete="name"
+                    required
+                  />
 
-          {/* Username Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              style={[styles.input, errors.username && styles.inputError]}
-              placeholder="Choose a unique username"
-              value={formData.username}
-              onChangeText={(text) => updateFormData('username', text)}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
-          </View>
+                  <Input
+                    label="Username"
+                    placeholder="Choose a unique username"
+                    value={formData.username}
+                    onChangeText={(text) => updateFormData('username', text)}
+                    error={errors.username}
+                    leftIcon="at-outline"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="username"
+                    required
+                  />
 
-          {/* Password Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[styles.passwordInput, errors.password && styles.inputError]}
-                placeholder="Create a strong password"
-                value={formData.password}
-                onChangeText={(text) => updateFormData('password', text)}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-              />
-              <Pressable
-                style={styles.eyeIcon}
-                onPress={() => setShowPassword(!showPassword)}
-                accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                accessibilityRole="button"
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color="#666"
-                />
-              </Pressable>
-            </View>
-            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-          </View>
+                  <Input
+                    label="Password"
+                    placeholder="Create a strong password"
+                    value={formData.password}
+                    onChangeText={(text) => updateFormData('password', text)}
+                    error={errors.password}
+                    leftIcon="lock-closed-outline"
+                    showPasswordToggle
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    required
+                  />
 
-          {/* Confirm Password Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[styles.passwordInput, errors.confirmPassword && styles.inputError]}
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChangeText={(text) => updateFormData('confirmPassword', text)}
-                secureTextEntry={!showConfirmPassword}
-                autoCapitalize="none"
-              />
-              <Pressable
-                  style={styles.eyeIcon}
-                  onPress={() => setShowPassword(!showPassword)}
-                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                  accessibilityRole="button"
-                >
-                <Ionicons
-                  name={showConfirmPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color="#666"
-                />
-              </Pressable>
-            </View>
-            {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-          </View>
+                  <Input
+                    label="Confirm Password"
+                    placeholder="Confirm your password"
+                    value={formData.confirmPassword}
+                    onChangeText={(text) =>
+                      updateFormData('confirmPassword', text)
+                    }
+                    error={errors.confirmPassword}
+                    leftIcon="lock-closed-outline"
+                    showPasswordToggle
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    required
+                  />
 
-          <LoadingButton
-            title="Create Account"
-            onPress={handleRegister}
-            loading={loading}
-            style={styles.submitButton}
-            textStyle={styles.submitText}
-          />
+                  <Button
+                    title="Create Account"
+                    onPress={handleRegister}
+                    loading={loading}
+                    variant="gradient"
+                    size="large"
+                    fullWidth
+                    style={styles.registerButton}
+                  />
 
-          <Pressable onPress={() => router.replace('/')} style={styles.loginLink}>
-            <Text style={styles.loginText}>
-              Already have an account? <Text style={styles.loginTextBold}>Sign in</Text>
-            </Text>
-          </Pressable>
-        </View>
-      </ScrollView>
+                  <Divider label="or" style={styles.divider} />
+
+                  <Button
+                    title="Already have an account? Sign In"
+                    onPress={navigateToLogin}
+                    variant="outline"
+                    size="large"
+                    fullWidth
+                    icon="log-in-outline"
+                    style={styles.loginButton}
+                  />
+                </View>
+              </Card>
+
+              {/* Footer */}
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>
+                  By creating an account, you agree to our
+                </Text>
+                <Text style={styles.linkText}>Terms of Service</Text>
+                <Text style={styles.footerText}> and </Text>
+                <Text style={styles.linkText}>Privacy Policy</Text>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </LinearGradient>
 
       {/* Error Modal */}
       <ErrorModal
         visible={errorModal.visible}
         title={errorModal.title}
         message={errorModal.message}
-        onClose={() => setErrorModal({ visible: false, title: '', message: '' })}
+        onClose={() =>
+          setErrorModal({ visible: false, title: '', message: '' })
+        }
         type="error"
       />
 
@@ -248,16 +280,22 @@ const validateForm = (): ValidationErrors => {
         onHide={hideToast}
         position="top"
       />
-    </KeyboardAvoidingView>
+    </>
   );
 };
 
 export default Register;
 
+
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+  },
+  keyboardView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -265,112 +303,83 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
   },
+  logoContainer: {
+    marginBottom: 24,
+  },
+  iconBackground: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: AppColors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontSize: 32,
+    fontWeight: '800',
+    color: AppColors.textWhite,
     marginBottom: 8,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6c757d',
+    color: AppColors.textWhite,
     textAlign: 'center',
+    opacity: 0.9,
+    fontWeight: '500',
+    paddingHorizontal: 16,
+  },
+  formCard: {
+    marginBottom: 24,
   },
   form: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    paddingVertical: 8,
   },
-  inputContainer: {
-    marginBottom: 20,
+  registerButton: {
+    marginTop: 8,
+    marginBottom: 16,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
+  divider: {
+    marginVertical: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9fafb',
+  loginButton: {
+    marginTop: 8,
+    borderColor: AppColors.primary,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  inputError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  passwordContainer: {
-    position: 'relative',
+  footer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 32,
+    marginTop: 16,
   },
-  passwordInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9fafb',
-    paddingRight: 48,
-  },
-  eyeIcon: {
-    position: 'absolute',
-    right: 12,
-    padding: 4,
-  },
-  errorText: {
-    color: '#ef4444',
+  footerText: {
     fontSize: 12,
-    marginTop: 4,
-  },
-  submitButton: {
-    backgroundColor: '#10b981',
-    borderRadius: 8,
-    padding: 16,
-    marginTop: 24,
-    shadowColor: '#10b981',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  submitText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: AppColors.textWhite,
+    opacity: 0.8,
     textAlign: 'center',
   },
-  loginLink: {
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  loginText: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  loginTextBold: {
-    color: '#10b981',
+  linkText: {
+    fontSize: 12,
+    color: AppColors.textWhite,
     fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

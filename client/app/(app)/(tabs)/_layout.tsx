@@ -2,11 +2,14 @@
 import { Tabs } from 'expo-router';
 import React, { useState, useRef, useEffect } from 'react';
 import { Ionicons, Octicons } from '@expo/vector-icons';
-import { View, Pressable, Modal, Animated, BackHandler } from 'react-native';
+import { View, Pressable, Modal, Animated, BackHandler, useWindowDimensions, I18nManager } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppColors } from '../../../constants/colors';
 import AppDrawer from '../../../components/AppDrawer';
 
 export default function TabsLayout() {
+     const insets = useSafeAreaInsets();
+     const { width } = useWindowDimensions();
      const [isDrawerOpen, setIsDrawerOpen] = useState(false);
       const slideAnim = useRef(new Animated.Value(0)).current;
       const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -65,11 +68,16 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: AppColors.tabInactive,
         tabBarStyle: {
           backgroundColor: AppColors.tabBar,
-          height: 60,
-          paddingBottom: 8,
+          paddingBottom: Math.max(8, insets.bottom),
           paddingTop: 8,
           borderTopWidth: 0,
+          // Android shadow
           elevation: 8,
+          // iOS shadow
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 6,
         },
         tabBarHideOnKeyboard: true,
         tabBarShowLabel: false,
@@ -163,10 +171,12 @@ export default function TabsLayout() {
           {/* Drawer */}
           <Animated.View
             style={{
+              width: Math.min(360, width * 0.85),
+              alignSelf: I18nManager.isRTL ? 'flex-start' : 'flex-end',
               transform: [{
                 translateX: slideAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [300, 0], // Slide from right
+                  outputRange: I18nManager.isRTL ? [-Math.min(360, width * 0.85), 0] : [Math.min(360, width * 0.85), 0],
                 }),
               }],
               

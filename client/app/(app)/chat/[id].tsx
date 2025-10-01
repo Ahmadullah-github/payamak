@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,9 @@ export default function ChatScreen() {
     setChatMessages,
     getChat,
     addChat,
-    setActiveChat
+    setActiveChat,
+    clearChatUnread,
+    markAllMessagesReadInChat,
   } = useMessageStore();
   
   // Local state
@@ -45,6 +47,8 @@ export default function ChatScreen() {
   const [chatData, setChatData] = useState<Chat | null>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
   const flatListRef = useRef<FlatList>(null);
+  const initialUnreadRef = useRef<number>(0);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
   const { toast, showError, hideToast } = useToast();
 
   const messages = chatId ? getMessagesForChat(chatId) : [];
@@ -57,13 +61,23 @@ export default function ChatScreen() {
     }
     return () => {
       setActiveChat(null);
-      // Leave chat room when component unmounts
       if (socket && chatData?.id && !chatData.id.startsWith('new-')) {
         leaveChatRoom(chatData.id);
         console.log('📬 Left chat room:', chatData.id);
       }
     };
   }, [chatId, setActiveChat, socket, chatData?.id, leaveChatRoom]);
+
+  // Capture initial unread count and clear after chat data loads
+  useEffect(() => {
+    if (chatData?.id && chatId === chatData.id) {
+      if (!initialUnreadRef.current) {
+        initialUnreadRef.current = chatData.unreadCount || 0;
+      }
+      clearChatUnread(chatData.id);
+      markAllMessagesReadInChat(chatData.id);
+    }
+  }, [chatData?.id]);
 
   // Load chat data and messages
   useEffect(() => {
@@ -239,6 +253,83 @@ export default function ChatScreen() {
     } finally {
       setLoadingMessages(false);
     }
+  };
+
+  // Enhanced list with date separators and unread divider
+  type EnhancedItem = { kind: 'message'; message: ChatMessage } | { kind: 'date'; label: string } | { kind: 'unread' };
+
+  const firstUnreadIndex = useMemo(() => {
+    const count = initialUnreadRef.current || 0;
+    if (!messages || messages.length === 0 || count <= 0 || count > messages.length) return -1;
+    return messages.length - count;
+  }, [messages]);
+
+  const enhancedData: EnhancedItem[] = useMemo(() => {
+    const items: EnhancedItem[] = [];
+    let prevDayKey: string | null = null;
+    messages.forEach((msg, index) => {
+      const d = new Date(msg.timestamp);
+      const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (dayKey !== prevDayKey) {
+        const label = d.toLocaleDateString('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        items.push({ kind: 'date', label });
+        prevDayKey = dayKey;
+      }
+      if (firstUnreadIndex === index) {
+        items.push({ kind: 'unread' });
+      }
+      items.push({ kind: 'message', message: msg });
+    });
+    return items;
+  }, [messages, firstUnreadIndex]);
+
+  const renderEnhancedItem = ({ item, index }: { item: EnhancedItem; index: number }) => {
+    if (item.kind === 'date') {
+      return (
+        <View style={{ alignItems: 'center', marginVertical: 8 }}>
+          <Text style={{ fontSize: 12, color: AppColors.textMuted, backgroundColor: AppColors.inputBackground, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 }}>
+            {item.label}
+          </Text>
+        </View>
+      );
+    }
+    if (item.kind === 'unread') {
+      return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8, paddingHorizontal: 16 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: AppColors.divider }} />
+          <Text style={{ marginHorizontal: 8, fontSize: 12, color: AppColors.unreadBadge, fontWeight: '600' }}>پیام‌های خوانده‌نشده</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: AppColors.divider }} />
+        </View>
+      );
+    }
+    const message = item.message;
+    const isMyMessage = message.senderId === currentUser?.id.toString();
+    // Determine consecutive
+    let isConsecutive = false;
+    for (let j = index - 1; j >= 0; j--) {
+      const prev = enhancedData[j];
+      if (prev.kind !== 'message') continue;
+      const sameSender = prev.message.senderId === message.senderId;
+      const sameDay = new Date(prev.message.timestamp).toDateString() === new Date(message.timestamp).toDateString();
+      isConsecutive = sameSender && sameDay;
+      break;
+    }
+    return (
+      <MessageBubble
+        message={message}
+        isMyMessage={isMyMessage}
+        showSenderName={isGroupChat && !isMyMessage && !isConsecutive}
+        isGroupChat={isGroupChat}
+        onLongPress={() => {
+          console.log('Message options for:', message.id);
+        }}
+        onSenderPress={(senderId) => {
+          console.log('View profile of:', senderId);
+        }}
+        showTimestamp={!isConsecutive}
+        isConsecutive={isConsecutive}
+      />
+    );
   };
 
   // Socket event listeners for real-time messages
@@ -500,9 +591,9 @@ export default function ChatScreen() {
           {/* Messages List */}
           <FlatList
             ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
+            data={enhancedData}
+            keyExtractor={(_, i) => `itm-${i}`}
+            renderItem={renderEnhancedItem}
             className="flex-1"
             style={{ backgroundColor: AppColors.chatBackground }}
             contentContainerStyle={{ 
@@ -511,6 +602,11 @@ export default function ChatScreen() {
             }}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
             showsVerticalScrollIndicator={false}
+            onScroll={(e) => {
+              const y = e.nativeEvent.contentOffset.y;
+              setShowScrollBottom(y > 150);
+            }}
+            scrollEventThrottle={16}
             ListEmptyComponent={() => (
               <View className="flex-1 justify-center items-center" style={{ paddingTop: 100 }}>
                 {loadingMessages ? (
@@ -581,21 +677,21 @@ export default function ChatScreen() {
               >
                 <Ionicons name="add" size={24} color={AppColors.textMuted} />
               </Pressable>
-              <TextInput
-                className="flex-1 text-base py-2 max-h-24"
+          <TextInput
+            className="flex-1 text-base py-2 max-h-32"
                 placeholder="پیام خود را بنویسید..."
                 placeholderTextColor={AppColors.textMuted}
                 value={inputText}
                 onChangeText={setInputText}
                 multiline
-                maxLength={1000}
+            maxLength={2000}
                 textAlign="right"
                 style={{
                   color: AppColors.textPrimary,
                   fontSize: 16,
-                  minHeight: 20,
-                  textAlignVertical: 'center',
-                  paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+              minHeight: 20,
+              textAlignVertical: 'top',
+              paddingVertical: Platform.OS === 'ios' ? 10 : 6,
                 }}
               />
               <Pressable 
@@ -625,6 +721,30 @@ export default function ChatScreen() {
               />
             </Pressable>
           </View>
+          {/* Scroll to bottom button */}
+          {showScrollBottom && (
+            <Pressable
+              onPress={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              style={{
+                position: 'absolute',
+                right: 16,
+                bottom: 90,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: AppColors.primary,
+                justifyContent: 'center',
+                alignItems: 'center',
+                elevation: 3,
+                shadowColor: AppColors.shadow,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+              }}
+            >
+              <Ionicons name="chevron-down" size={22} color={AppColors.textWhite} />
+            </Pressable>
+          )}
         </KeyboardAvoidingView>
       </View>
       

@@ -29,13 +29,23 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
   // --- ACTIONS ---
   connect: (token) => {
-    if (get().socket) return; // already connected
+    const existing = get().socket;
+    const shouldReconnect = !existing || !existing.connected || (existing as any).auth?.token !== token;
+    if (!shouldReconnect) return;
+
+    if (existing) {
+      try { existing.disconnect(); } catch {}
+    }
 
     console.log('🔌 Connecting to socket:', SOCKET_URL_DEVICE);
     const newSocket = io(SOCKET_URL_DEVICE, {
       auth: { token },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       timeout: 20000,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     newSocket.on('connect', () => {

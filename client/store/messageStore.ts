@@ -69,6 +69,7 @@ interface MessageState {
   addMessage: (chatId: string, message: ChatMessage) => void;
   updateMessageStatus: (messageId: string, status: 'delivered' | 'read') => void;
   markMessageAsRead: (messageId: string, userId: string) => void;
+  markAllMessagesReadInChat: (chatId: string) => void;
   getMessagesForChat: (chatId: string) => ChatMessage[];
   setChatMessages: (chatId: string, messages: ChatMessage[]) => void;
   loadChatMessages: (chatId: string, limit?: number, offset?: number) => Promise<void>;
@@ -76,6 +77,7 @@ interface MessageState {
   // Chat operations
   addChat: (chat: Chat) => void;
   updateChat: (chatId: string, updates: Partial<Chat>) => void;
+  clearChatUnread: (chatId: string) => void;
   getChat: (chatId: string) => Chat | null;
   getAllChats: () => Chat[];
   setActiveChat: (chatId: string | null) => void;
@@ -141,6 +143,19 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     });
   },
 
+  markAllMessagesReadInChat: (chatId) => {
+    set((state) => {
+      const chatMessages = state.messages[chatId] || [];
+      const updatedChatMessages = chatMessages.map((msg) => ({ ...msg, isRead: true, status: 'read' }));
+      return {
+        messages: {
+          ...state.messages,
+          [chatId]: updatedChatMessages,
+        },
+      };
+    });
+  },
+
   getMessagesForChat: (chatId) => {
     return get().messages[chatId] || [];
   },
@@ -169,6 +184,15 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       chats: {
         ...state.chats,
         [chatId]: { ...state.chats[chatId], ...updates },
+      },
+    }));
+  },
+
+  clearChatUnread: (chatId) => {
+    set((state) => ({
+      chats: {
+        ...state.chats,
+        [chatId]: { ...state.chats[chatId], unreadCount: 0 },
       },
     }));
   },

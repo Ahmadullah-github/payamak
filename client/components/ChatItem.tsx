@@ -48,6 +48,20 @@ export function ChatItem({
     });
   };
 
+  const formatTimestamp = (isoOrString: string) => {
+    const date = new Date(isoOrString);
+    if (Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const dayMs = 24 * 60 * 60 * 1000;
+    if (diff < dayMs) {
+      return date.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+    }
+    if (diff < 2 * dayMs) return 'دیروز';
+    if (diff < 7 * dayMs) return `${Math.floor(diff / dayMs)} روز پیش`;
+    return date.toLocaleDateString('fa-IR');
+  };
+
   return (
     <Pressable 
       style={({ pressed }) => ({
@@ -107,7 +121,7 @@ export function ChatItem({
                 fontWeight: hasUnread ? '500' : '400',
               }}
             >
-              {timestamp}
+              {formatTimestamp(timestamp)}
             </Text>
           </View>
           

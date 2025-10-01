@@ -1,8 +1,7 @@
 // client/store/authStore.ts
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
-import { API_URL } from '../config';
+import { tokenStorage } from '../utils/tokenStorage';
+import api, { authApi } from '../api';
 import { useSocketStore } from './socketStore';
 
 interface User {
@@ -29,8 +28,7 @@ interface AuthState {
 // 👇 Extracted for reuse and to avoid `get()` recursion
 const clearSession = async (set: (partial: Partial<AuthState>) => void) => {
   useSocketStore.getState().disconnect();
-  delete axios.defaults.headers.common['Authorization'];
-  await SecureStore.deleteItemAsync('authToken');
+  await tokenStorage.clearToken();
   set({ token: null, user: null });
 };
 
@@ -46,12 +44,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initializeAuth: async () => {
     try {
-      const storedToken = await SecureStore.getItemAsync('authToken');
+      const storedToken = await tokenStorage.getToken();
       console.log('🔐 Initializing auth with stored token:', !!storedToken);
 
       if (storedToken) {
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        const response = await axios.get(`${API_URL}/auth/profile`);
+        const response = await authApi.getProfile();
         
         // Handle the enhanced response structure
         const userData = response.data.success ? response.data.user : response.data;
@@ -70,15 +67,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (username, password) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, { username, password });
+      const response = await authApi.login(username, password);
       
       // Handle the enhanced response structure
       const responseData = response.data;
       const newToken = responseData.token;
       const userData = responseData.user;
 
-      axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      await SecureStore.setItemAsync('authToken', newToken);
+      await tokenStorage.setToken(newToken);
 
       set({ token: newToken, user: userData });
       useSocketStore.getState().connect(newToken);
@@ -94,7 +90,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   register: async (username, password, fullName) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/register`, { username, password, fullName });
+      const response = await authApi.register(username, password, fullName);
       console.log('✅ Registration successful');
       return { success: true };
     } catch (error: any) {
@@ -112,7 +108,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   refreshProfile: async () => {
     try {
-      const response = await axios.get(`${API_URL}/auth/profile`);
+      const response = await authApi.getProfile();
       const userData = response.data.success ? response.data.user : response.data;
       
       set((state) => ({

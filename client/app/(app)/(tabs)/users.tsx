@@ -330,7 +330,6 @@ export default function UsersScreen() {
             borderRadius: 16,
             paddingHorizontal: 16,
             paddingVertical: 12,
-            backdropFilter: 'blur(10px)',
           }}
         >
           <Ionicons name="search" size={20} color="rgba(255,255,255,0.8)" />
@@ -393,7 +392,7 @@ export default function UsersScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <StatusBar backgroundColor="#3b82f6" barStyle="light-content" />
+      <StatusBar barStyle="light-content" />
 
       <FlatList
         data={filteredUsers}
