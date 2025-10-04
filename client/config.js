@@ -4,8 +4,8 @@ export const API_URL_LOCAL = 'http://localhost:3000/api';
 export const SOCKET_URL_LOCAL = 'http://localhost:3000';
 
 // For device testing (replace with your actual IP)
-export const API_URL_DEVICE = 'http://192.168.137.37:3000/api';
-export const SOCKET_URL_DEVICE = 'http://192.168.137.37:3000';
+export const API_URL_DEVICE = 'http://192.168.5.96:3000/api';
+export const SOCKET_URL_DEVICE = 'http://192.168.5.96:3000';
 
 // Auto-detect environment
 // For development, use device IP for better compatibility
