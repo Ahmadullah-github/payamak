@@ -1,7 +1,7 @@
 // File: client/api/apiClient.ts
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { API_URL } from '../config';
-import { tokenStorage } from '../utils/tokenStorage';
+import { tokenStorage } from '../store/tokenStorage';
 
 // Create a single axios instance for all API calls
 const createApiClient = (): AxiosInstance => {

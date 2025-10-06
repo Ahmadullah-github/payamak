@@ -8,9 +8,11 @@ import {
   StyleSheet,
   Dimensions,
   Animated,
+  AccessibilityRole,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface ErrorModalProps {
   visible: boolean;
@@ -26,6 +28,8 @@ interface ErrorModalProps {
   };
   onClose: () => void;
   type?: 'error' | 'warning' | 'info';
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
 const { width } = Dimensions.get('window');
@@ -38,7 +42,11 @@ export default function ErrorModal({
   secondaryAction,
   onClose,
   type = 'error',
+  accessibilityLabel,
+  testID,
 }: ErrorModalProps) {
+  const { spacing, typography } = useTheme();
+
   const getIconName = () => {
     switch (type) {
       case 'error':
@@ -57,9 +65,9 @@ export default function ErrorModal({
       case 'error':
         return AppColors.error;
       case 'warning':
-        return '#FF9500';
+        return AppColors.warning;
       case 'info':
-        return AppColors.primary;
+        return AppColors.info;
       default:
         return AppColors.error;
     }
@@ -73,7 +81,11 @@ export default function ErrorModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
+      <View 
+        style={styles.overlay}
+        accessibilityLabel={accessibilityLabel || title}
+        testID={testID}
+      >
         <View style={styles.container}>
           {/* Icon */}
           <View style={styles.iconContainer}>
@@ -86,8 +98,19 @@ export default function ErrorModal({
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.message}>{message}</Text>
+            <Text style={[styles.title, { 
+              fontSize: typography.heading3.fontSize,
+              fontWeight: typography.heading3.fontWeight,
+              lineHeight: typography.heading3.lineHeight
+            }]}>
+              {title}
+            </Text>
+            <Text style={[styles.message, { 
+              fontSize: typography.body.fontSize,
+              lineHeight: typography.body.lineHeight
+            }]}>
+              {message}
+            </Text>
           </View>
 
           {/* Actions */}
@@ -99,8 +122,14 @@ export default function ErrorModal({
                   secondaryAction.onPress();
                   onClose();
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={secondaryAction.text}
               >
-                <Text style={styles.secondaryButtonText}>
+                <Text style={[styles.secondaryButtonText, { 
+                  fontSize: typography.button.fontSize,
+                  fontWeight: typography.button.fontWeight,
+                  lineHeight: typography.button.lineHeight
+                }]}>
                   {secondaryAction.text}
                 </Text>
               </Pressable>
@@ -118,8 +147,14 @@ export default function ErrorModal({
                 }
                 onClose();
               }}
+              accessibilityRole="button"
+              accessibilityLabel={primaryAction?.text || 'OK'}
             >
-              <Text style={styles.primaryButtonText}>
+              <Text style={[styles.primaryButtonText, { 
+                fontSize: typography.button.fontSize,
+                fontWeight: typography.button.fontWeight,
+                lineHeight: typography.button.lineHeight
+              }]}>
                 {primaryAction?.text || 'OK'}
               </Text>
             </Pressable>
@@ -159,14 +194,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
     color: AppColors.textPrimary,
     textAlign: 'center',
     marginBottom: 8,
   },
   message: {
-    fontSize: 16,
     color: AppColors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
@@ -192,13 +224,9 @@ const styles = StyleSheet.create({
     borderColor: AppColors.divider,
   },
   primaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
     color: AppColors.textWhite,
   },
   secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
     color: AppColors.textSecondary,
   },
 });

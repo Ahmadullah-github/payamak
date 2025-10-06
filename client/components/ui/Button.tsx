@@ -9,15 +9,17 @@ import {
   TextStyle,
   Animated,
   View,
+  AccessibilityState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'gradient';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'gradient' | 'danger';
   size?: 'small' | 'medium' | 'large';
   loading?: boolean;
   disabled?: boolean;
@@ -27,6 +29,9 @@ interface ButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   gradientColors?: string[];
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  testID?: string;
 }
 
 export default function Button({
@@ -42,16 +47,35 @@ export default function Button({
   style,
   textStyle,
   gradientColors = [AppColors.primary, AppColors.primaryLight],
+  accessibilityLabel,
+  accessibilityHint,
+  testID,
 }: ButtonProps) {
+  const { spacing, typography } = useTheme();
   const scaleValue = useRef(new Animated.Value(1)).current;
   const opacityValue = useRef(new Animated.Value(1)).current;
 
   const isDisabled = disabled || loading;
 
   const sizeStyles = {
-    small: { paddingVertical: 8, paddingHorizontal: 16, fontSize: 14 },
-    medium: { paddingVertical: 12, paddingHorizontal: 20, fontSize: 16 },
-    large: { paddingVertical: 16, paddingHorizontal: 24, fontSize: 18 },
+    small: { 
+      paddingVertical: spacing.sm, 
+      paddingHorizontal: spacing.md, 
+      fontSize: typography.bodySmall.fontSize,
+      height: 36
+    },
+    medium: { 
+      paddingVertical: spacing.md, 
+      paddingHorizontal: spacing.lg, 
+      fontSize: typography.body.fontSize,
+      height: 44
+    },
+    large: { 
+      paddingVertical: spacing.lg, 
+      paddingHorizontal: spacing.xl, 
+      fontSize: typography.bodyLarge.fontSize,
+      height: 52
+    },
   };
 
   const handlePressIn = () => {
@@ -90,6 +114,7 @@ export default function Button({
       {
         paddingVertical: sizeStyles[size].paddingVertical,
         paddingHorizontal: sizeStyles[size].paddingHorizontal,
+        minHeight: sizeStyles[size].height,
       },
       fullWidth && styles.fullWidth,
       isDisabled && styles.disabled,
@@ -114,6 +139,8 @@ export default function Button({
         return [...baseStyle, { backgroundColor: 'transparent' }];
       case 'gradient':
         return baseStyle;
+      case 'danger':
+        return [...baseStyle, { backgroundColor: AppColors.error }];
       default:
         return [...baseStyle, { backgroundColor: AppColors.primary }];
     }
@@ -122,7 +149,10 @@ export default function Button({
   const getTextStyle = () => {
     const baseTextStyle = [
       styles.text,
-      { fontSize: sizeStyles[size].fontSize },
+      { 
+        fontSize: sizeStyles[size].fontSize,
+        lineHeight: sizeStyles[size].fontSize * 1.5
+      },
       textStyle,
     ];
 
@@ -135,6 +165,8 @@ export default function Button({
       case 'outline':
       case 'ghost':
         return [...baseTextStyle, { color: AppColors.primary }];
+      case 'danger':
+        return [...baseTextStyle, { color: AppColors.textWhite }];
       default:
         return [...baseTextStyle, { color: AppColors.textWhite }];
     }
@@ -146,7 +178,7 @@ export default function Button({
         <ActivityIndicator
           size="small"
           color={
-            variant === 'primary' || variant === 'gradient'
+            variant === 'primary' || variant === 'gradient' || variant === 'danger'
               ? AppColors.textWhite
               : AppColors.primary
           }
@@ -158,7 +190,7 @@ export default function Button({
               name={icon}
               size={sizeStyles[size].fontSize}
               color={
-                variant === 'primary' || variant === 'gradient'
+                variant === 'primary' || variant === 'gradient' || variant === 'danger'
                   ? AppColors.textWhite
                   : AppColors.primary
               }
@@ -171,7 +203,7 @@ export default function Button({
               name={icon}
               size={sizeStyles[size].fontSize}
               color={
-                variant === 'primary' || variant === 'gradient'
+                variant === 'primary' || variant === 'gradient' || variant === 'danger'
                   ? AppColors.textWhite
                   : AppColors.primary
               }
@@ -182,6 +214,11 @@ export default function Button({
       )}
     </View>
   );
+
+  const accessibilityState: AccessibilityState = {
+    disabled: isDisabled,
+    busy: loading,
+  };
 
   const ButtonComponent = (
     <Animated.View
@@ -197,10 +234,14 @@ export default function Button({
         onPressOut={handlePressOut}
         disabled={isDisabled}
         android_ripple={{
-          color: variant === 'primary' || variant === 'gradient' 
+          color: variant === 'primary' || variant === 'gradient' || variant === 'danger'
             ? 'rgba(255,255,255,0.2)' 
             : 'rgba(0,0,0,0.1)',
         }}
+        accessibilityLabel={accessibilityLabel || title}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={accessibilityState}
+        testID={testID}
       >
         {variant === 'gradient' ? (
           <LinearGradient
@@ -226,7 +267,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
     elevation: 2,
     shadowColor: AppColors.shadow,
     shadowOffset: { width: 0, height: 2 },

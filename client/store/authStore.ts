@@ -1,6 +1,6 @@
 // client/store/authStore.ts
 import { create } from 'zustand';
-import { tokenStorage } from '../utils/tokenStorage';
+import { tokenStorage } from './tokenStorage';
 import api, { authApi } from '../api';
 import { useSocketStore } from './socketStore';
 

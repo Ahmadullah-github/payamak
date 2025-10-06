@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, ViewStyle } from 'react-native';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface SkeletonProps {
   width?: number | string;
@@ -10,6 +11,8 @@ interface SkeletonProps {
   style?: ViewStyle;
   variant?: 'text' | 'rectangular' | 'circular' | 'rounded';
   animationDuration?: number;
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
 export default function Skeleton({
@@ -19,7 +22,10 @@ export default function Skeleton({
   style,
   variant = 'text',
   animationDuration = 1500,
+  accessibilityLabel,
+  testID,
 }: SkeletonProps) {
+  const { spacing } = useTheme();
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -77,13 +83,22 @@ export default function Skeleton({
         } as ViewStyle | any,
         style,
       ]}
+      accessibilityLabel={accessibilityLabel || "Loading content"}
+      testID={testID}
     />
   );
 }
 
 // Predefined skeleton components for common use cases
-export const SkeletonText = ({ lines = 3, ...props }: { lines?: number } & Partial<SkeletonProps>) => (
-  <View>
+export const SkeletonText = ({ 
+  lines = 3, 
+  ...props 
+}: { 
+  lines?: number; 
+} & Partial<SkeletonProps>) => (
+  <View 
+    accessibilityLabel="Loading text content"
+  >
     {Array.from({ length: lines }).map((_, index) => (
       <Skeleton
         key={index}
@@ -97,17 +112,28 @@ export const SkeletonText = ({ lines = 3, ...props }: { lines?: number } & Parti
   </View>
 );
 
-export const SkeletonAvatar = ({ size = 48, ...props }: { size?: number } & Partial<SkeletonProps>) => (
+export const SkeletonAvatar = ({ 
+  size = 48, 
+  ...props 
+}: { 
+  size?: number; 
+} & Partial<SkeletonProps>) => (
   <Skeleton
     width={size}
     height={size}
     variant="circular"
+    accessibilityLabel="Loading avatar"
     {...props}
   />
 );
 
-export const SkeletonCard = ({ ...props }: Partial<SkeletonProps>) => (
-  <View style={styles.cardContainer}>
+export const SkeletonCard = ({ 
+  ...props 
+}: Partial<SkeletonProps>) => (
+  <View 
+    style={styles.cardContainer}
+    accessibilityLabel="Loading card content"
+  >
     <View style={styles.cardHeader}>
       <SkeletonAvatar size={40} />
       <View style={styles.cardHeaderText}>

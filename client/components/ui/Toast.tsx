@@ -7,9 +7,11 @@ import {
   Dimensions,
   StyleSheet,
   Pressable,
+  AccessibilityRole,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface ToastProps {
   visible: boolean;
@@ -20,6 +22,8 @@ interface ToastProps {
   position?: 'top' | 'bottom';
   actionLabel?: string;
   onActionPress?: () => void;
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
 const { width } = Dimensions.get('window');
@@ -33,7 +37,10 @@ export default function Toast({
   position = 'top',
   actionLabel,
   onActionPress,
+  accessibilityLabel,
+  testID,
 }: ToastProps) {
+  const { spacing } = useTheme();
   const translateY = useRef(new Animated.Value(position === 'top' ? -100 : 100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -100,7 +107,7 @@ export default function Toast({
     switch (type) {
       case 'success':
         return {
-          background: '#4CAF50',
+          background: AppColors.success,
           text: AppColors.textWhite,
           icon: AppColors.textWhite,
         };
@@ -112,7 +119,7 @@ export default function Toast({
         };
       case 'warning':
         return {
-          background: '#FF9500',
+          background: AppColors.warning,
           text: AppColors.textWhite,
           icon: AppColors.textWhite,
         };
@@ -135,6 +142,8 @@ export default function Toast({
 
   if (!visible) return null;
 
+  const accessibilityRole: AccessibilityRole = type === 'error' ? 'alert' : 'none';
+
   return (
     <Animated.View
       style={[
@@ -148,6 +157,9 @@ export default function Toast({
         },
       ]}
       pointerEvents="box-none"
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel || message}
+      testID={testID}
     >
       <View style={styles.content}>
         <Ionicons
@@ -169,6 +181,8 @@ export default function Toast({
               onActionPress();
               hideToast();
             }}
+            accessibilityRole="button"
+            accessibilityLabel={actionLabel}
           >
             <Text style={[styles.actionText, { color: colors.text }]}>
               {actionLabel}

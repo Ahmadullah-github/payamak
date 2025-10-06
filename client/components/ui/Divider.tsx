@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface DividerProps {
   label?: string;
@@ -12,6 +13,8 @@ interface DividerProps {
   color?: string;
   style?: ViewStyle;
   spacing?: number;
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
 export default function Divider({
@@ -22,7 +25,10 @@ export default function Divider({
   color = AppColors.divider,
   style,
   spacing = 16,
+  accessibilityLabel,
+  testID,
 }: DividerProps) {
+  const { typography } = useTheme();
   const isHorizontal = orientation === 'horizontal';
 
   // Warn in development if non-solid variant is used
@@ -32,9 +38,19 @@ export default function Divider({
 
   if (label && isHorizontal) {
     return (
-      <View style={[styles.labelContainer, { marginVertical: spacing / 2 }, style]}>
+      <View 
+        style={[styles.labelContainer, { marginVertical: spacing / 2 }, style]}
+        accessibilityLabel={accessibilityLabel || "Divider with label"}
+        testID={testID}
+      >
         <View style={[styles.line, { backgroundColor: color, height: thickness }]} />
-        <Text style={[styles.label, { color: AppColors.textMuted }]}>{label}</Text>
+        <Text style={[styles.label, { 
+          color: AppColors.textMuted,
+          fontSize: typography.bodySmall.fontSize,
+          fontWeight: typography.bodySmall.fontWeight
+        }]}>
+          {label}
+        </Text>
         <View style={[styles.line, { backgroundColor: color, height: thickness }]} />
       </View>
     );
@@ -51,6 +67,8 @@ export default function Divider({
           },
           style,
         ]}
+        accessibilityLabel={accessibilityLabel || "Divider"}
+        testID={testID}
       />
     );
   } else {
@@ -66,6 +84,8 @@ export default function Divider({
           },
           style,
         ]}
+        accessibilityLabel={accessibilityLabel || "Vertical divider"}
+        testID={testID}
       />
     );
   }
@@ -81,7 +101,6 @@ const styles = StyleSheet.create({
   },
   label: {
     paddingHorizontal: 16,
-    fontSize: 14,
     fontWeight: '500',
   },
 });

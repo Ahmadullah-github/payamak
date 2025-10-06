@@ -7,9 +7,11 @@ import {
   StyleSheet,
   ViewStyle,
   Animated,
+  AccessibilityState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface SearchBarProps {
   placeholder?: string;
@@ -18,9 +20,13 @@ interface SearchBarProps {
   onClear?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  onSubmitEditing?: () => void;
   style?: ViewStyle;
   autoFocus?: boolean;
   variant?: 'default' | 'rounded';
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  testID?: string;
 }
 
 export default function SearchBar({
@@ -30,12 +36,18 @@ export default function SearchBar({
   onClear,
   onFocus,
   onBlur,
+  onSubmitEditing,
   style,
   autoFocus = false,
   variant = 'default',
+  accessibilityLabel,
+  accessibilityHint,
+  testID,
 }: SearchBarProps) {
+  const { spacing } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
   const scaleValue = useRef(new Animated.Value(1)).current;
+  const inputRef = useRef<TextInput>(null);
 
   const handleFocus = () => {
     setIsFocused(true);
@@ -58,6 +70,14 @@ export default function SearchBar({
   const handleClear = () => {
     onChangeText('');
     onClear?.();
+    // Focus the input after clearing
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
+  };
+
+  const handleSubmitEditing = () => {
+    onSubmitEditing?.();
   };
 
   const containerStyle = [
@@ -83,6 +103,7 @@ export default function SearchBar({
       </View>
       
       <TextInput
+        ref={inputRef}
         style={styles.input}
         placeholder={placeholder}
         placeholderTextColor={AppColors.textMuted}
@@ -92,13 +113,19 @@ export default function SearchBar({
         onBlur={handleBlur}
         autoFocus={autoFocus}
         returnKeyType="search"
+        onSubmitEditing={handleSubmitEditing}
+        accessibilityLabel={accessibilityLabel || "Search"}
+        accessibilityHint={accessibilityHint || "Enter search terms"}
+        testID={testID}
       />
       
       {value.length > 0 && (
         <Pressable
           style={styles.clearButton}
           onPress={handleClear}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: spacing.sm, bottom: spacing.sm, left: spacing.sm, right: spacing.sm }}
+          accessibilityLabel="Clear search"
+          accessibilityRole="button"
         >
           <Ionicons
             name="close-circle"

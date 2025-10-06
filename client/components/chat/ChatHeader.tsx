@@ -1,10 +1,12 @@
 // File: components/chat/ChatHeader.tsx
 import React from 'react';
-import { View, Text, Pressable, Image } from 'react-native';
+import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/colors';
 import { Chat, ChatMember } from '../../store/messageStore';
-import { RelativePathString, router } from 'expo-router';
+import { router } from 'expo-router';
+import { useTheme } from '../../constants/theme';
+import OnlineStatusIndicator from './OnlineStatusIndicator';
 
 interface ChatHeaderProps {
   chat: Chat;
@@ -12,6 +14,8 @@ interface ChatHeaderProps {
   onCallPress?: () => void;
   onVideoCallPress?: () => void;
   onInfoPress?: () => void;
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
 // Direct chat header
@@ -20,8 +24,12 @@ export function DirectChatHeader({
   onBackPress, 
   onCallPress, 
   onVideoCallPress, 
-  onInfoPress 
+  onInfoPress,
+  accessibilityLabel,
+  testID,
 }: ChatHeaderProps) {
+  const { typography } = useTheme();
+
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
@@ -40,54 +48,77 @@ export function DirectChatHeader({
   };
 
   return (
-    <View className="flex-row items-center px-4 py-2" style={{ backgroundColor: AppColors.primary }}>
+    <View 
+      style={[styles.header, { backgroundColor: AppColors.primary }]}
+      accessibilityLabel={accessibilityLabel || `Chat with ${chat.name}`}
+      testID={testID}
+    >
       {/* Back Button */}
       <Pressable 
         onPress={handleBackPress}
-        className="mr-3 p-2"
         style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+        accessibilityLabel="Go back"
+        accessibilityRole="button"
       >
         <Ionicons name="arrow-back" size={24} color="white" />
       </Pressable>
 
       {/* User Info */}
       <Pressable 
-        className="flex-row items-center flex-1"
+        style={styles.userInfo}
         onPress={handleInfoPress}
-        style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
+        accessibilityLabel={`View profile of ${chat.name}`}
+        accessibilityRole="button"
       >
         <Image
           source={{ uri: `https://i.pravatar.cc/150?u=${chat.id}` }}
-          className="w-10 h-10 rounded-full mr-3"
+          style={styles.avatar}
         />
-        <View className="flex-1">
-          <Text className="text-lg font-semibold text-white">{chat.name}</Text>
-          <Text className="text-xs text-blue-100">
-            {chat.isOnline ? 'آنلاین' : 'آفلاین'}
+        <View style={styles.userDetails}>
+          <Text 
+            style={[styles.userName, { 
+              fontSize: typography.body.fontSize,
+              fontWeight: typography.body.fontWeight,
+              lineHeight: typography.body.lineHeight,
+              color: AppColors.textWhite
+            }]}
+            numberOfLines={1}
+          >
+            {chat.name}
           </Text>
+          <View style={styles.statusContainer}>
+            <OnlineStatusIndicator 
+              isOnline={!!chat.isOnline} 
+              showText 
+              size="small"
+            />
+          </View>
         </View>
       </Pressable>
 
       {/* Action Buttons */}
-      <View className="flex-row items-center">
+      <View style={styles.actions}>
         <Pressable 
-          className="p-2 mr-2"
-          onPress={onVideoCallPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          onPress={onVideoCallPress}
+          accessibilityLabel="Video call"
+          accessibilityRole="button"
         >
           <Ionicons name="videocam" size={24} color="white" />
         </Pressable>
         <Pressable 
-          className="p-2 mr-2"
-          onPress={onCallPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          onPress={onCallPress}
+          accessibilityLabel="Voice call"
+          accessibilityRole="button"
         >
           <Ionicons name="call" size={24} color="white" />
         </Pressable>
         <Pressable 
-          className="p-2"
-          onPress={handleInfoPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          onPress={handleInfoPress}
+          accessibilityLabel="More options"
+          accessibilityRole="button"
         >
           <Ionicons name="ellipsis-vertical" size={24} color="white" />
         </Pressable>
@@ -102,8 +133,11 @@ export function GroupChatHeader({
   onBackPress, 
   onCallPress, 
   onVideoCallPress, 
-  onInfoPress 
+  onInfoPress,
+  accessibilityLabel,
+  testID,
 }: ChatHeaderProps) {
+  const { typography } = useTheme();
   const memberCount = chat.members?.length || 0;
   const onlineCount = chat.members?.filter(member => member.isOnline).length || 0;
 
@@ -120,84 +154,97 @@ export function GroupChatHeader({
       onInfoPress();
     } else {
       // Navigate to group info
-      router.push({
-        pathname: "/(app)/group-info/[id]" as RelativePathString,
-        params: { id: chat.id }
-      });
+      console.log('Navigate to group info:', chat.id);
     }
   };
 
   const getStatusText = () => {
     if (onlineCount > 0) {
-      return `${memberCount} عضو، ${onlineCount} آنلاین`;
+      return `${memberCount} members, ${onlineCount} online`;
     }
-    return `${memberCount} عضو`;
+    return `${memberCount} members`;
   };
 
   return (
-    <View className="flex-row items-center px-4 py-2\" style={{ backgroundColor: AppColors.primary }}>
+    <View 
+      style={[styles.header, { backgroundColor: AppColors.primary }]}
+      accessibilityLabel={accessibilityLabel || `Group chat ${chat.name}`}
+      testID={testID}
+    >
       {/* Back Button */}
       <Pressable 
         onPress={handleBackPress}
-        className="mr-3 p-2"
         style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+        accessibilityLabel="Go back"
+        accessibilityRole="button"
       >
         <Ionicons name="arrow-back" size={24} color="white" />
       </Pressable>
 
       {/* Group Info */}
       <Pressable 
-        className="flex-row items-center flex-1"
+        style={styles.userInfo}
         onPress={handleInfoPress}
-        style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
+        accessibilityLabel={`View group info for ${chat.name}`}
+        accessibilityRole="button"
       >
-        <View className="relative mr-3">
+        <View style={styles.groupAvatarContainer}>
           <Image
             source={{ uri: `https://i.pravatar.cc/150?u=group${chat.id}` }}
-            className="w-10 h-10 rounded-full"
+            style={styles.avatar}
           />
           {/* Group indicator */}
-          <View 
-            className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full justify-center items-center"
-            style={{
-              backgroundColor: AppColors.primary,
-              borderWidth: 1,
-              borderColor: 'white',
-            }}
-          >
+          <View style={styles.groupIndicator}>
             <Ionicons name="people" size={8} color="white" />
           </View>
         </View>
-        <View className="flex-1">
-          <Text className="text-lg font-semibold text-white" numberOfLines={1}>
+        <View style={styles.userDetails}>
+          <Text 
+            style={[styles.userName, { 
+              fontSize: typography.body.fontSize,
+              fontWeight: typography.body.fontWeight,
+              lineHeight: typography.body.lineHeight,
+              color: AppColors.textWhite
+            }]}
+            numberOfLines={1}
+          >
             {chat.name}
           </Text>
-          <Text className="text-xs text-blue-100">
+          <Text 
+            style={[styles.groupStatus, { 
+              fontSize: typography.caption.fontSize,
+              lineHeight: typography.caption.lineHeight,
+              color: 'rgba(255, 255, 255, 0.8)'
+            }]}
+          >
             {getStatusText()}
           </Text>
         </View>
       </Pressable>
 
       {/* Action Buttons */}
-      <View className="flex-row items-center">
+      <View style={styles.actions}>
         <Pressable 
-          className="p-2 mr-2"
-          onPress={onVideoCallPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          onPress={onVideoCallPress}
+          accessibilityLabel="Video call"
+          accessibilityRole="button"
         >
           <Ionicons name="videocam" size={24} color="white" />
         </Pressable>
         <Pressable 
-          className="p-2 mr-2"
-          onPress={onCallPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          onPress={onCallPress}
+          accessibilityLabel="Voice call"
+          accessibilityRole="button"
         >
           <Ionicons name="call" size={24} color="white" />
         </Pressable>
         <Pressable 
-          className="p-2"
-          onPress={handleInfoPress}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          onPress={handleInfoPress}
+          accessibilityLabel="More options"
+          accessibilityRole="button"
         >
           <Ionicons name="ellipsis-vertical" size={24} color="white" />
         </Pressable>
@@ -208,31 +255,111 @@ export function GroupChatHeader({
 
 // Online members indicator for group chats
 export function OnlineMembersIndicator({ members }: { members: ChatMember[] }) {
+  const { typography } = useTheme();
   const onlineMembers = members.filter(member => member.isOnline);
   
   if (onlineMembers.length === 0) return null;
 
   return (
     <View 
-      className="mx-4 mb-2 px-3 py-2 rounded-lg"
-      style={{ backgroundColor: 'rgba(76, 175, 80, 0.1)' }}
+      style={styles.onlineMembersContainer}
     >
-      <View className="flex-row items-center">
+      <View style={styles.onlineMembersContent}>
         <Ionicons name="radio-button-on" size={12} color={AppColors.online} />
         <Text 
-          className="mr-2 text-sm"
-          style={{ color: AppColors.online }}
+          style={[styles.onlineMembersLabel, { 
+            fontSize: typography.bodySmall.fontSize,
+            lineHeight: typography.bodySmall.lineHeight,
+            color: AppColors.online,
+            marginRight: 4
+          }]}
         >
-          آنلاین: 
+          Online:
         </Text>
         <Text 
-          className="flex-1 text-sm"
-          style={{ color: AppColors.textPrimary }}
+          style={[styles.onlineMembersList, { 
+            fontSize: typography.bodySmall.fontSize,
+            lineHeight: typography.bodySmall.lineHeight,
+            color: AppColors.textPrimary
+          }]}
           numberOfLines={1}
         >
-          {onlineMembers.map(member => member.fullName).join('، ')}
+          {onlineMembers.map(member => member.fullName).join(', ')}
         </Text>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  groupAvatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  groupIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: AppColors.primary,
+    borderWidth: 1,
+    borderColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
+    marginBottom: 2,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupStatus: {
+    opacity: 0.8,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  onlineMembersContainer: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  onlineMembersContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  onlineMembersLabel: {
+    fontWeight: '500',
+  },
+  onlineMembersList: {
+    flex: 1,
+  },
+});

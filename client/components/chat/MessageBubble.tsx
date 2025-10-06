@@ -14,6 +14,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors } from '../../constants/colors';
 import { ChatMessage } from '../../store/messageStore';
 import { Avatar } from '../ui';
+import { formatMessageTime } from '../ui/utils';
+import { useTheme } from '../../constants/theme';
+import MessageStatusIndicator from './MessageStatusIndicator';
+import FileAttachment from './FileAttachment';
+import MediaPreview from './MediaPreview';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -25,6 +30,8 @@ interface MessageBubbleProps {
   onMessagePress?: () => void;
   showTimestamp?: boolean;
   isConsecutive?: boolean;
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
 export default function MessageBubble({
@@ -37,14 +44,14 @@ export default function MessageBubble({
   onMessagePress,
   showTimestamp = true,
   isConsecutive = false,
+  accessibilityLabel,
+  testID,
 }: MessageBubbleProps) {
+  const { typography } = useTheme();
   const [scaleValue] = useState(new Animated.Value(1));
   const [showTime, setShowTime] = useState(false);
 
-  const messageTime = new Date(message.timestamp).toLocaleTimeString('fa-IR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const messageTime = formatMessageTime(new Date(message.timestamp));
 
   const messageDate = new Date(message.timestamp).toLocaleDateString('fa-IR', {
     year: 'numeric',
@@ -87,37 +94,6 @@ export default function MessageBubble({
     );
   };
 
-  const renderMessageStatus = () => {
-    if (!isMyMessage) return null;
-
-    let iconName: keyof typeof Ionicons.glyphMap;
-    let iconColor: string;
-
-    switch (message.status) {
-      case 'sent':
-        iconName = 'checkmark';
-        iconColor = AppColors.textMuted;
-        break;
-      case 'delivered':
-        iconName = 'checkmark-done';
-        iconColor = AppColors.textMuted;
-        break;
-      case 'read':
-        iconName = 'checkmark-done';
-        iconColor = AppColors.accent;
-        break;
-      default:
-        iconName = 'time';
-        iconColor = AppColors.textMuted;
-    }
-
-    return (
-      <View style={styles.statusContainer}>
-        <Ionicons name={iconName} size={16} color={iconColor} />
-      </View>
-    );
-  };
-
   const renderMessageContent = () => {
     if (message.type === 'text') {
       // Simple URL detection (you can enhance this with a proper URL parser)
@@ -125,7 +101,10 @@ export default function MessageBubble({
       const parts = message.content.split(urlRegex);
       
       return (
-        <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.otherMessageText]}>
+        <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.otherMessageText, { 
+          fontSize: typography.body.fontSize,
+          lineHeight: typography.body.lineHeight
+        }]}>
           {parts.map((part, index) => {
             if (urlRegex.test(part)) {
               return (
@@ -144,7 +123,29 @@ export default function MessageBubble({
       );
     }
 
-    // Handle other message types (images, files, etc.)
+    if (message.type === 'image' || message.type === 'video' || message.type === 'audio') {
+      return (
+        <MediaPreview
+          uri={message.mediaFile?.url || ''}
+          type={message.type}
+          caption={message.content}
+        />
+      );
+    }
+
+    // Handle file attachments
+    if (message.mediaFile) {
+      return (
+        <FileAttachment
+          fileName={message.mediaFile.filename}
+          fileSize={message.mediaFile.size}
+          fileType={message.mediaFile.mimeType}
+          onDownload={() => console.log('Download file:', message.mediaFile?.id)}
+        />
+      );
+    }
+
+    // Handle other message types
     return (
       <View style={styles.mediaContainer}>
         <Ionicons
@@ -152,7 +153,10 @@ export default function MessageBubble({
           size={24}
           color={isMyMessage ? AppColors.textWhite : AppColors.textPrimary}
         />
-        <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.otherMessageText]}>
+        <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.otherMessageText, { 
+          fontSize: typography.body.fontSize,
+          lineHeight: typography.body.lineHeight
+        }]}>
           {message.mediaFile?.filename || 'File'}
         </Text>
       </View>
@@ -175,12 +179,16 @@ export default function MessageBubble({
         isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer,
         { transform: [{ scale: scaleValue }] },
       ]}
+      accessibilityLabel={accessibilityLabel || `Message from ${message.senderName}, ${message.content}`}
+      testID={testID}
     >
       {/* Avatar for group chats (other users only) */}
       {isGroupChat && !isMyMessage && !isConsecutive && (
         <Pressable
           onPress={() => onSenderPress?.(message.senderId)}
           style={styles.avatarContainer}
+          accessibilityLabel={`View profile of ${message.senderName}`}
+          accessibilityRole="button"
         >
           <Avatar
             name={message.senderName}
@@ -198,8 +206,18 @@ export default function MessageBubble({
       <View style={styles.bubbleContainer}>
         {/* Sender name for group chats */}
         {getSenderDisplayName() && (
-          <Pressable onPress={() => onSenderPress?.(message.senderId)}>
-            <Text style={styles.senderName}>{getSenderDisplayName()}</Text>
+          <Pressable 
+            onPress={() => onSenderPress?.(message.senderId)}
+            accessibilityLabel={`View profile of ${message.senderName}`}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.senderName, { 
+              fontSize: typography.caption.fontSize,
+              lineHeight: typography.caption.lineHeight,
+              color: AppColors.textMuted
+            }]}>
+              {getSenderDisplayName()}
+            </Text>
           </Pressable>
         )}
 
@@ -210,6 +228,8 @@ export default function MessageBubble({
           onPressOut={handlePressOut}
           onLongPress={onLongPress}
           delayLongPress={300}
+          accessibilityLabel={`Message from ${message.senderName}, ${message.content}`}
+          accessibilityRole="text"
         >
           {isMyMessage ? (
             <LinearGradient
@@ -220,15 +240,27 @@ export default function MessageBubble({
             >
               {renderMessageContent()}
               <View style={styles.messageFooter}>
-                <Text style={styles.messageTime}>{messageTime}</Text>
-                {renderMessageStatus()}
+                <Text style={[styles.messageTime, { 
+                  fontSize: typography.caption.fontSize,
+                  lineHeight: typography.caption.lineHeight,
+                  color: 'rgba(255,255,255,0.8)'
+                }]}>
+                  {messageTime}
+                </Text>
+                <MessageStatusIndicator 
+                  status={message.status} 
+                  isOwnMessage={isMyMessage} 
+                />
               </View>
             </LinearGradient>
           ) : (
             <View style={getBubbleStyle()}>
               {renderMessageContent()}
               <View style={styles.messageFooter}>
-                <Text style={[styles.messageTime, styles.otherMessageTime]}>
+                <Text style={[styles.messageTime, styles.otherMessageTime, { 
+                  fontSize: typography.caption.fontSize,
+                  lineHeight: typography.caption.lineHeight
+                }]}>
                   {messageTime}
                 </Text>
               </View>
@@ -239,7 +271,12 @@ export default function MessageBubble({
         {/* Extended timestamp (shown on tap) */}
         {showTime && showTimestamp && (
           <Animated.View style={styles.timestampContainer}>
-            <Text style={styles.timestampText}>
+            <Text style={[styles.timestampText, { 
+              fontSize: typography.caption.fontSize,
+              lineHeight: typography.caption.lineHeight,
+              color: AppColors.textMuted,
+              backgroundColor: AppColors.inputBackground
+            }]}>
               {messageDate} at {messageTime}
             </Text>
           </Animated.View>
@@ -257,6 +294,7 @@ export function TypingIndicator({
   senderName?: string; 
   isGroupChat?: boolean; 
 }) {
+  const { typography } = useTheme();
   const dotAnim1 = new Animated.Value(0);
   const dotAnim2 = new Animated.Value(0);
   const dotAnim3 = new Animated.Value(0);
@@ -285,12 +323,24 @@ export function TypingIndicator({
       
       <View style={styles.bubbleContainer}>
         {isGroupChat && senderName && (
-          <Text style={styles.senderName}>{senderName}</Text>
+          <Text style={[styles.senderName, { 
+            fontSize: typography.caption.fontSize,
+            lineHeight: typography.caption.lineHeight,
+            color: AppColors.textMuted
+          }]}>
+            {senderName}
+          </Text>
         )}
         
         <View style={[styles.messageBubble, styles.otherMessage, styles.typingBubble]}>
           <View style={styles.typingContainer}>
-            <Text style={styles.typingText}>typing</Text>
+            <Text style={[styles.typingText, { 
+              fontSize: typography.bodySmall.fontSize,
+              lineHeight: typography.bodySmall.lineHeight,
+              color: AppColors.textMuted
+            }]}>
+              typing
+            </Text>
             <View style={styles.dotsContainer}>
               <Animated.View style={[styles.dot, { opacity: dotAnim1 }]} />
               <Animated.View style={[styles.dot, { opacity: dotAnim2 }]} />
@@ -329,10 +379,7 @@ const styles = StyleSheet.create({
     minWidth: '20%',
   },
   senderName: {
-    fontSize: 12,
-    color: AppColors.textMuted,
     marginBottom: 4,
-    marginLeft: 12,
     fontWeight: '500',
   },
   messageBubble: {
@@ -364,8 +411,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 18,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 22,
     fontWeight: '400',
   },
   myMessageText: {
@@ -389,24 +434,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   messageTime: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
     fontWeight: '500',
   },
   otherMessageTime: {
     color: AppColors.textMuted,
-  },
-  statusContainer: {
-    marginLeft: 4,
   },
   timestampContainer: {
     alignItems: 'center',
     marginTop: 8,
   },
   timestampText: {
-    fontSize: 12,
-    color: AppColors.textMuted,
-    backgroundColor: AppColors.inputBackground,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -420,8 +457,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typingText: {
-    fontSize: 14,
-    color: AppColors.textMuted,
     marginRight: 8,
     fontStyle: 'italic',
   },

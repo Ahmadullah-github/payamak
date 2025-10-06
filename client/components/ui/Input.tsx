@@ -10,13 +10,16 @@ import {
   ViewStyle,
   TextStyle,
   Animated,
+  AccessibilityState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
   error?: string;
+  helperText?: string;
   variant?: 'outlined' | 'filled';
   size?: 'small' | 'medium' | 'large';
   leftIcon?: keyof typeof Ionicons.glyphMap;
@@ -27,11 +30,15 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   labelStyle?: TextStyle;
   showPasswordToggle?: boolean;
   required?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  testID?: string;
 }
 
 export default function Input({
   label,
   error,
+  helperText,
   variant = 'filled',
   size = 'medium',
   leftIcon,
@@ -42,17 +49,21 @@ export default function Input({
   labelStyle,
   showPasswordToggle = false,
   required = false,
+  accessibilityLabel,
+  accessibilityHint,
+  testID,
   secureTextEntry,
   ...textInputProps
 }: InputProps) {
+  const { spacing, typography } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [scaleValue] = useState(new Animated.Value(1));
 
   const sizeStyles = {
-    small: { height: 40, fontSize: 14, paddingHorizontal: 12 },
-    medium: { height: 48, fontSize: 16, paddingHorizontal: 16 },
-    large: { height: 56, fontSize: 18, paddingHorizontal: 20 },
+    small: { height: 40, fontSize: typography.bodySmall.fontSize, paddingHorizontal: spacing.sm },
+    medium: { height: 48, fontSize: typography.body.fontSize, paddingHorizontal: spacing.md },
+    large: { height: 56, fontSize: typography.bodyLarge.fontSize, paddingHorizontal: spacing.lg },
   };
 
   const actualSecureTextEntry = showPasswordToggle ? !showPassword : secureTextEntry;
@@ -82,14 +93,15 @@ export default function Input({
       styles.input,
       sizeStyles[size],
       variant === 'outlined' ? styles.outlined : styles.filled,
-      leftIcon && { paddingLeft: 48 },
-      (rightIcon || showPasswordToggle) && { paddingRight: 48 },
+      leftIcon && { paddingLeft: spacing.xl + spacing.sm },
+      (rightIcon || showPasswordToggle) && { paddingRight: spacing.xl + spacing.sm },
       isFocused && styles.focused,
       error && styles.error,
       inputStyle,
     ];
     return baseStyle;
   };
+
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -107,7 +119,7 @@ export default function Input({
         ]}
       >
         {leftIcon && (
-          <View style={styles.leftIconContainer}>
+          <View style={[styles.iconContainer, { left: spacing.md }]}>
             <Ionicons
               name={leftIcon}
               size={20}
@@ -122,12 +134,15 @@ export default function Input({
           onBlur={handleBlur}
           secureTextEntry={actualSecureTextEntry}
           placeholderTextColor={AppColors.textMuted}
+          accessibilityLabel={accessibilityLabel || label}
+          accessibilityHint={accessibilityHint}
+          testID={testID}
           {...textInputProps}
         />
         
         {(rightIcon || showPasswordToggle) && (
           <Pressable
-            style={styles.rightIconContainer}
+            style={[styles.iconContainer, { right: spacing.md }]}
             onPress={showPasswordToggle ? togglePassword : onRightIconPress}
           >
             <Ionicons
@@ -145,8 +160,10 @@ export default function Input({
         )}
       </Animated.View>
       
-      {error && (
-        <Text style={styles.errorText}>{error}</Text>
+      {(error || helperText) && (
+        <Text style={[styles.helperText, error ? styles.errorText : styles.helperTextStyle]}>
+          {error || helperText}
+        </Text>
       )}
     </View>
   );
@@ -190,26 +207,22 @@ const styles = StyleSheet.create({
   error: {
     borderColor: AppColors.error,
   },
-  leftIconContainer: {
+  iconContainer: {
     position: 'absolute',
-    left: 16,
     top: 0,
     bottom: 0,
     justifyContent: 'center',
     zIndex: 1,
   },
-  rightIconContainer: {
-    position: 'absolute',
-    right: 16,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  errorText: {
+  helperText: {
     fontSize: 12,
-    color: AppColors.error,
     marginTop: 4,
     fontWeight: '500',
+  },
+  errorText: {
+    color: AppColors.error,
+  },
+  helperTextStyle: {
+    color: AppColors.textMuted,
   },
 });

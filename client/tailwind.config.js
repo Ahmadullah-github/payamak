@@ -24,6 +24,21 @@ module.exports = {
         divider: '#E9EDEF',
         textMuted: '#8696A0',
         unreadBadge: '#25D366',
+        online: '#25D366',
+        offline: '#8696A0',
+        
+        // Extended color palette
+        blue: '#3B82F6',
+        blueLight: '#93C5FD',
+        green: '#10B981',
+        greenLight: '#6EE7B7',
+        red: '#EF4444',
+        redLight: '#FCA5A5',
+        yellow: '#F59E0B',
+        purple: '#8B5CF6',
+        gray: '#6B7280',
+        grayLight: '#E5E7EB',
+        grayDark: '#374151',
       },
       fontFamily: {
         'sans': ['Helvetica Neue', 'Arial', 'sans-serif'],

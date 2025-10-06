@@ -1,8 +1,10 @@
 // File: components/ui/Avatar.tsx
 import React from 'react';
-import { View, Image, Text, StyleSheet, ViewStyle, ImageStyle, StyleProp } from 'react-native';
+import { View, Image, Text, StyleSheet, ViewStyle, ImageStyle, StyleProp, AccessibilityRole } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/colors';
+import { getInitials } from './utils';
+import { useTheme } from '../../constants/theme';
 
 interface AvatarProps {
   uri?: string;
@@ -13,6 +15,8 @@ interface AvatarProps {
   style?: ViewStyle;
   borderColor?: string;
   borderWidth?: number;
+  accessibilityLabel?: string;
+  testID?: string;
 }
 
 export default function Avatar({
@@ -23,8 +27,12 @@ export default function Avatar({
   isOnline = false,
   style,
   borderColor,
-  borderWidth = 0,
+  borderWidth = 2,
+  accessibilityLabel,
+  testID,
 }: AvatarProps) {
+  const { spacing } = useTheme();
+
   const sizeMap = {
     small: 32,
     medium: 48,
@@ -50,48 +58,63 @@ export default function Avatar({
   const indicatorSize = indicatorSizeMap[size];
   const fontSize = fontSizeMap[size];
 
-  const getInitials = (fullName: string) => {
-    if (!fullName?.trim()) return '?';
-    const names = fullName.trim().split(' ');
-    if (names.length === 1) {
-      return names[0].charAt(0).toUpperCase();
-    }
-    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
-  };
-
-  const avatarStyle = [
-    styles.avatar,
-    {
-      width: avatarSize,
-      height: avatarSize,
-      borderRadius: avatarSize / 2,
-      borderColor: borderColor || AppColors.border,
-      borderWidth,
-    },
-    style,
-  ];
-
-  // Only render Image if uri is a valid non-empty string
   const isValidUri = uri && uri.trim().length > 0;
 
   return (
-    <View style={styles.container}>
+    <View 
+      style={styles.container}
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel || `${name || 'User'} avatar`}
+      testID={testID}
+    >
       {isValidUri ? (
         <Image
           source={{ uri }}
-          style={avatarStyle as StyleProp<ImageStyle>}
+          style={[
+            styles.avatar,
+            {
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
+              borderColor: borderColor || AppColors.border,
+              borderWidth,
+            },
+            style,
+          ] as StyleProp<ImageStyle>}
           resizeMode="cover"
+          accessibilityIgnoresInvertColors
         />
       ) : (
-        <View style={[avatarStyle, styles.placeholderAvatar]}>
+        <View 
+          style={[
+            styles.avatar,
+            styles.placeholderAvatar,
+            {
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
+              borderColor: borderColor || AppColors.border,
+              borderWidth,
+            },
+            style,
+          ]}
+        >
           {name ? (
-            <Text style={[styles.initials, { fontSize }]}>
+            <Text 
+              style={[
+                styles.initials, 
+                { 
+                  fontSize,
+                  color: AppColors.textWhite,
+                }
+              ]}
+            >
               {getInitials(name)}
             </Text>
           ) : (
             <Ionicons
               name="person"
-              size={fontSize * 0.8} // Slightly smaller than text for balance
+              size={fontSize * 0.8}
               color={AppColors.textWhite}
             />
           )}
@@ -106,12 +129,14 @@ export default function Avatar({
               width: indicatorSize,
               height: indicatorSize,
               borderRadius: indicatorSize / 2,
-              // Position inside the avatar to avoid clipping (especially on Android)
-              bottom: Math.max(2, avatarSize * 0.05), // e.g., 2-4px from bottom-right
+              bottom: Math.max(2, avatarSize * 0.05),
               right: Math.max(2, avatarSize * 0.05),
-              backgroundColor: isOnline ? AppColors.onlineStatus : AppColors.offlineStatus,
+              backgroundColor: isOnline ? AppColors.online : AppColors.offline,
+              borderColor: AppColors.background,
+              borderWidth: 2,
             },
           ]}
+          accessibilityLabel={isOnline ? "Online" : "Offline"}
         />
       )}
     </View>
@@ -121,7 +146,6 @@ export default function Avatar({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    // Ensure container doesn't clip the indicator (helps on iOS; Android limitation remains)
     overflow: 'visible',
   },
   avatar: {
@@ -133,13 +157,15 @@ const styles = StyleSheet.create({
     backgroundColor: AppColors.primary,
   },
   initials: {
-    color: AppColors.textWhite,
     fontWeight: '600',
     includeFontPadding: false,
   },
   onlineIndicator: {
     position: 'absolute',
-    borderWidth: 2,
-    borderColor: AppColors.background,
+    shadowColor: AppColors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });

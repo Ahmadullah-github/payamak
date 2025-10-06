@@ -1,10 +1,12 @@
 // File: components/chat/ChatItem.tsx
 import React from 'react';
-import { View, Text, Pressable, Image } from 'react-native';
+import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AppColors } from '../../constants/colors';
-import { Chat } from '../../store/messageStore';
 import { router } from 'expo-router';
+import { AppColors } from '../../constants/colors';
+import { formatChatTime, getInitials } from '../ui/utils';
+import { useTheme } from '../../constants/theme';
+import { Chat } from '../../store/messageStore';
 
 interface BaseChatItemProps {
   chat: Chat;
@@ -13,6 +15,7 @@ interface BaseChatItemProps {
 
 // Base chat item component with common functionality
 function BaseChatItem({ chat, onPress, children }: BaseChatItemProps & { children: React.ReactNode }) {
+  const { typography } = useTheme();
   const hasUnread = chat.unreadCount > 0;
   
   const handlePress = () => {
@@ -27,27 +30,6 @@ function BaseChatItem({ chat, onPress, children }: BaseChatItemProps & { childre
     }
   };
 
-  const formatTimestamp = (date?: Date) => {
-    if (!date) return '';
-    
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) {
-      return date.toLocaleTimeString('fa-IR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } else if (days === 1) {
-      return 'دیروز';
-    } else if (days < 7) {
-      return `${days} روز پیش`;
-    } else {
-      return date.toLocaleDateString('fa-IR');
-    }
-  };
-
   return (
     <Pressable 
       style={({ pressed }) => ({
@@ -57,69 +39,64 @@ function BaseChatItem({ chat, onPress, children }: BaseChatItemProps & { childre
       })}
       onPress={handlePress}
       android_ripple={{ color: '#F5F5F5' }}
+      accessibilityLabel={`Chat with ${chat.name}, ${hasUnread ? `${chat.unreadCount} unread messages` : 'no unread messages'}`}
+      accessibilityRole="button"
     >
-      <View className="flex-row items-center">
+      <View style={styles.chatRow}>
         {children}
         
         {/* Chat Content */}
-        <View className="flex-1 ml-3">
+        <View style={styles.chatContent}>
           {/* Header Row */}
-          <View className="flex-row justify-between items-center">
-            <View className="flex-1 mr-2">
+          <View style={styles.headerRow}>
+            <View style={styles.nameContainer}>
               <Text 
-                className="text-base font-medium" 
+                style={[styles.chatName, { 
+                  fontSize: typography.body.fontSize,
+                  fontWeight: typography.body.fontWeight,
+                  lineHeight: typography.body.lineHeight
+                }]}
                 numberOfLines={1}
-                style={{ 
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: '500',
-                }}
               >
                 {chat.name}
               </Text>
             </View>
             <Text 
-              className="text-xs"
-              style={{ 
+              style={[styles.timestamp, { 
+                fontSize: typography.caption.fontSize,
+                lineHeight: typography.caption.lineHeight,
                 color: hasUnread ? AppColors.unreadBadge : AppColors.textMuted,
-                fontSize: 12,
-                fontWeight: hasUnread ? '500' : '400',
-              }}
+                fontWeight: hasUnread ? typography.caption.fontWeight : '400'
+              }]}
             >
-              {formatTimestamp(chat.lastMessageTime)}
+              {formatChatTime(chat.lastMessageTime)}
             </Text>
           </View>
           
           {/* Message Row */}
-          <View className="flex-row justify-between items-center">
+          <View style={styles.messageRow}>
             <Text 
-              className="flex-1 mr-2 mt-2" 
+              style={[styles.lastMessage, { 
+                fontSize: typography.bodySmall.fontSize,
+                lineHeight: typography.bodySmall.lineHeight,
+                color: AppColors.textMuted
+              }]}
               numberOfLines={1}
-              style={{ 
-                color: AppColors.textMuted,
-                fontSize: 14,
-              }}
             >
-              {chat.lastMessage || 'هیچ پیامی'}
+              {chat.lastMessage || 'No messages yet'}
             </Text>
             
             {/* Unread badge */}
             {hasUnread && (
               <View 
-                className="rounded-full justify-center items-center min-w-[20px] h-5 px-1.5"
-                style={{
-                  backgroundColor: AppColors.unreadBadge,
-                  minWidth: 20,
-                  height: 20,
-                }}
+                style={styles.unreadBadge}
               >
                 <Text 
-                  className="text-white font-medium text-xs"
-                  style={{
-                    color: AppColors.textWhite,
-                    fontSize: 12,
+                  style={[styles.unreadCount, { 
+                    fontSize: typography.caption.fontSize,
                     fontWeight: '600',
-                  }}
+                    color: AppColors.textWhite
+                  }]}
                 >
                   {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
                 </Text>
@@ -137,28 +114,24 @@ export function DirectChatItem({ chat, onPress }: BaseChatItemProps) {
   return (
     <BaseChatItem chat={chat} onPress={onPress}>
       {/* User Avatar */}
-      <View className="relative">
-        <Image
-          source={{ uri: `https://i.pravatar.cc/150?u=${chat.id}` }}
-          className="w-14 h-14 rounded-full"
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-          }}
-        />
+      <View style={styles.avatarContainer}>
+        <View style={styles.avatar}>
+          {chat.members && chat.members.length > 0 ? (
+            <Image
+              source={{ uri: `https://i.pravatar.cc/150?u=${chat.members[0].id}` }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitials}>
+                {chat.name ? getInitials(chat.name) : '?'}
+              </Text>
+            </View>
+          )}
+        </View>
         {/* Online status indicator */}
         {chat.isOnline && (
-          <View 
-            className="absolute bottom-0 right-0 w-4 h-4 rounded-full border-2"
-            style={{
-              backgroundColor: AppColors.online,
-              borderColor: AppColors.background,
-              width: 16,
-              height: 16,
-              borderRadius: 8,
-            }}
-          />
+          <View style={styles.onlineIndicator} />
         )}
       </View>
     </BaseChatItem>
@@ -172,37 +145,14 @@ export function GroupChatItem({ chat, onPress }: BaseChatItemProps) {
   return (
     <BaseChatItem chat={chat} onPress={onPress}>
       {/* Group Avatar */}
-      <View className="relative">
-        <View 
-          className="w-14 h-14 rounded-full justify-center items-center"
-          style={{
-            backgroundColor: '#E9EDEF',
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-          }}
-        >
+      <View style={styles.avatarContainer}>
+        <View style={styles.groupAvatar}>
           <Image
             source={{ uri: `https://i.pravatar.cc/150?u=group${chat.id}` }}
-            className="w-14 h-14 rounded-full"
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-            }}
+            style={styles.avatarImage}
           />
           {/* Group indicator */}
-          <View 
-            className="absolute bottom-0 right-0 w-4 h-4 rounded-full justify-center items-center"
-            style={{
-              backgroundColor: AppColors.background,
-              borderWidth: 1,
-              borderColor: AppColors.divider,
-              width: 16,
-              height: 16,
-              borderRadius: 8,
-            }}
-          >
+          <View style={styles.groupIndicator}>
             <Ionicons name="people" size={8} color={AppColors.textMuted} />
           </View>
         </View>
@@ -210,3 +160,109 @@ export function GroupChatItem({ chat, onPress }: BaseChatItemProps) {
     </BaseChatItem>
   );
 }
+
+const styles = StyleSheet.create({
+  chatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  groupAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E9EDEF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  avatarPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: AppColors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitials: {
+    color: AppColors.textWhite,
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: AppColors.online,
+    borderColor: AppColors.background,
+    borderWidth: 2,
+  },
+  groupIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: AppColors.background,
+    borderWidth: 1,
+    borderColor: AppColors.divider,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatContent: {
+    flex: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  nameContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  chatName: {
+    color: AppColors.textPrimary,
+  },
+  timestamp: {
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  messageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lastMessage: {
+    flex: 1,
+    marginRight: 8,
+  },
+  unreadBadge: {
+    backgroundColor: AppColors.unreadBadge,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  unreadCount: {
+    includeFontPadding: false,
+  },
+});

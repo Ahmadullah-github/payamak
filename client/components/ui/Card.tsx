@@ -2,14 +2,18 @@
 import React from 'react';
 import { View, ViewStyle, StyleSheet } from 'react-native';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface CardProps {
   children: React.ReactNode;
   style?: ViewStyle;
   padding?: 'none' | 'small' | 'medium' | 'large';
   shadow?: boolean;
-  borderRadius?: 'small' | 'medium' | 'large';
+  borderRadius?: 'none' | 'small' | 'medium' | 'large' | 'full';
   backgroundColor?: string;
+  variant?: 'elevated' | 'outlined' | 'filled';
+  borderColor?: string;
+  borderWidth?: number;
 }
 
 export default function Card({
@@ -19,18 +23,45 @@ export default function Card({
   shadow = true,
   borderRadius = 'medium',
   backgroundColor = AppColors.background,
+  variant = 'elevated',
+  borderColor = AppColors.border,
+  borderWidth = 1,
 }: CardProps) {
+  const { spacing } = useTheme();
+
   const paddingStyles = {
     none: 0,
-    small: 12,
-    medium: 16,
-    large: 24,
+    small: spacing.sm,
+    medium: spacing.md,
+    large: spacing.lg,
   };
 
   const radiusStyles = {
+    none: 0,
     small: 8,
     medium: 12,
     large: 16,
+    full: 999,
+  };
+
+  const getBorderStyle = () => {
+    switch (variant) {
+      case 'outlined':
+        return {
+          borderWidth,
+          borderColor,
+        };
+      case 'filled':
+        return {
+          borderWidth: 0,
+          backgroundColor,
+        };
+      case 'elevated':
+      default:
+        return {
+          borderWidth: 0,
+        };
+    }
   };
 
   return (
@@ -42,7 +73,8 @@ export default function Card({
           borderRadius: radiusStyles[borderRadius],
           backgroundColor,
         },
-        shadow && styles.shadow,
+        getBorderStyle(),
+        shadow && variant === 'elevated' && styles.shadow,
         style,
       ]}
     >

@@ -1,4 +1,4 @@
-// Enhanced WhatsApp-like color scheme with theme support
+// Enhanced WhatsApp-like color scheme with theme support and additional utilities
 
 interface ColorScheme {
   // Primary colors
@@ -33,8 +33,8 @@ interface ColorScheme {
   overlay: string;
   
   // Status colors
-  onlineStatus: string;
-  offlineStatus: string;
+  online: string;
+  offline: string;
   unreadBadge: string;
   success: string;
   warning: string;
@@ -53,6 +53,19 @@ interface ColorScheme {
   pressed: string;
   focused: string;
   disabled: string;
+  
+  // Extended color palette for more UI elements
+  blue: string;
+  blueLight: string;
+  green: string;
+  greenLight: string;
+  red: string;
+  redLight: string;
+  yellow: string;
+  purple: string;
+  gray: string;
+  grayLight: string;
+  grayDark: string;
 }
 
 // Light theme (WhatsApp-like)
@@ -89,8 +102,8 @@ const lightTheme: ColorScheme = {
   overlay: 'rgba(0,0,0,0.5)',
   
   // Status colors
-  onlineStatus: '#25D366',
-  offlineStatus: '#8696A0',
+  online: '#25D366',
+  offline: '#8696A0',
   unreadBadge: '#25D366',
   success: '#25D366',
   warning: '#FF9500',
@@ -109,6 +122,19 @@ const lightTheme: ColorScheme = {
   pressed: 'rgba(0,0,0,0.05)',
   focused: 'rgba(7,94,84,0.1)',
   disabled: 'rgba(0,0,0,0.3)',
+  
+  // Extended color palette
+  blue: '#3B82F6',
+  blueLight: '#93C5FD',
+  green: '#10B981',
+  greenLight: '#6EE7B7',
+  red: '#EF4444',
+  redLight: '#FCA5A5',
+  yellow: '#F59E0B',
+  purple: '#8B5CF6',
+  gray: '#6B7280',
+  grayLight: '#E5E7EB',
+  grayDark: '#374151',
 };
 
 // Dark theme
@@ -145,8 +171,8 @@ const darkTheme: ColorScheme = {
   overlay: 'rgba(0,0,0,0.7)',
   
   // Status colors
-  onlineStatus: '#25D366',
-  offlineStatus: '#667781',
+  online: '#25D366',
+  offline: '#667781',
   unreadBadge: '#25D366',
   success: '#25D366',
   warning: '#FF9500',
@@ -165,6 +191,19 @@ const darkTheme: ColorScheme = {
   pressed: 'rgba(255,255,255,0.05)',
   focused: 'rgba(37,211,102,0.2)',
   disabled: 'rgba(255,255,255,0.3)',
+  
+  // Extended color palette
+  blue: '#60A5FA',
+  blueLight: '#BFDBFE',
+  green: '#34D399',
+  greenLight: '#A7F3D0',
+  red: '#F87171',
+  redLight: '#FECACA',
+  yellow: '#FBBF24',
+  purple: '#A78BFA',
+  gray: '#9CA3AF',
+  grayLight: '#374151',
+  grayDark: '#111827',
 };
 
 // Export current theme (can be switched based on user preference)

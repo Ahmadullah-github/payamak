@@ -1,22 +1,54 @@
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import React, { useState } from 'react';
 import { Stack, router } from 'expo-router';
 import { useAuthStore } from '../../../store/authStore';
 import { AppColors } from '../../../constants/colors';
-import { Octicons } from '@expo/vector-icons';
+import { Octicons, Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../../constants/theme';
+import { Avatar } from '../../../components/ui';
+import  OnlineStatusIndicator  from '../../../components/chat/OnlineStatusIndicator';
 
 const ProfileScreen = () => {
   const { user, logout, isLoading } = useAuthStore();
+  const { spacing, typography } = useTheme();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    // After logout, the auth state will change, and the user will be redirected
-    // automatically by the logic in the root layout `app/(app)/_layout.tsx`.
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLoggingOut(true);
+            try {
+              await logout();
+              // After logout, the auth state will change, and the user will be redirected
+              // automatically by the logic in the root layout `app/(app)/_layout.tsx`.
+            } catch (error) {
+              console.error('Logout error:', error);
+            } finally {
+              setIsLoggingOut(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleEditProfile = () => {
-    // Navigate to an edit profile screen (to be created)
     router.push({pathname: '/(app)/profile/edit'});
+  };
+
+  const handleSettings = () => {
+    router.push({pathname: '/(app)/settings'});
+  };
+
+  const handleAbout = () => {
+    router.push({pathname: '/(app)/about'});
   };
 
   if (isLoading || !user) {
@@ -28,31 +60,99 @@ const ProfileScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ title: 'پروفایل' }} />
+    <ScrollView style={styles.container}>
+      <Stack.Screen options={{ title: 'Profile' }} />
       
       <View style={styles.profileHeader}>
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarText}>{user.fullName.charAt(0).toUpperCase()}</Text>
+        <Avatar 
+          name={user.fullName} 
+          size="xlarge" 
+          showOnlineIndicator 
+          isOnline 
+        />
+        <Text style={[styles.fullName, { 
+          fontSize: typography.heading2.fontSize,
+          fontWeight: typography.heading2.fontWeight,
+          lineHeight: typography.heading2.lineHeight
+        }]}>
+          {user.fullName}
+        </Text>
+        <View style={styles.usernameContainer}>
+          <Text style={[styles.username, { 
+            fontSize: typography.body.fontSize,
+            lineHeight: typography.body.lineHeight
+          }]}>
+            @{user.username}
+          </Text>
+          <OnlineStatusIndicator isOnline showText size="small" />
         </View>
-        <Text style={styles.fullName}>{user.fullName}</Text>
-        <Text style={styles.username}>@{user.username}</Text>
       </View>
 
       <View style={styles.menu}>
         <TouchableOpacity style={styles.menuItem} onPress={handleEditProfile}>
-          <Octicons name="pencil" size={20} color={AppColors.textPrimary} />
-          <Text style={styles.menuItemText}>ویرایش پروفایل</Text>
+          <View style={styles.menuItemIcon}>
+            <Octicons name="pencil" size={20} color={AppColors.textPrimary} />
+          </View>
+          <Text style={[styles.menuItemText, { 
+            fontSize: typography.body.fontSize,
+            lineHeight: typography.body.lineHeight
+          }]}>
+            Edit Profile
+          </Text>
+          <Ionicons name="chevron-forward" size={20} color={AppColors.textMuted} />
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.menuItem} onPress={handleSettings}>
+          <View style={styles.menuItemIcon}>
+            <Ionicons name="settings" size={20} color={AppColors.textPrimary} />
+          </View>
+          <Text style={[styles.menuItemText, { 
+            fontSize: typography.body.fontSize,
+            lineHeight: typography.body.lineHeight
+          }]}>
+            Settings
+          </Text>
+          <Ionicons name="chevron-forward" size={20} color={AppColors.textMuted} />
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.menuItem} onPress={handleAbout}>
+          <View style={styles.menuItemIcon}>
+            <Ionicons name="information-circle" size={20} color={AppColors.textPrimary} />
+          </View>
+          <Text style={[styles.menuItemText, { 
+            fontSize: typography.body.fontSize,
+            lineHeight: typography.body.lineHeight
+          }]}>
+            About
+          </Text>
+          <Ionicons name="chevron-forward" size={20} color={AppColors.textMuted} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={[styles.button, styles.logoutButton]} onPress={handleLogout}>
-          <Octicons name="sign-out" size={20} color={AppColors.textWhite} />
-          <Text style={styles.buttonText}>خروج از حساب</Text>
+        <TouchableOpacity 
+          style={[styles.button, styles.logoutButton]} 
+          onPress={handleLogout}
+          disabled={isLoggingOut}
+        >
+          {isLoggingOut ? (
+            <ActivityIndicator size="small" color={AppColors.textWhite} />
+          ) : (
+            <>
+              <Octicons name="sign-out" size={20} color={AppColors.textWhite} />
+              <Text style={[styles.buttonText, { 
+                fontSize: typography.button.fontSize,
+                fontWeight: typography.button.fontWeight,
+                lineHeight: typography.button.lineHeight,
+                marginLeft: 8
+              }]}>
+                Logout
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -66,38 +166,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: AppColors.background,
-    padding: 20,
   },
   profileHeader: {
     alignItems: 'center',
-    marginBottom: 40,
-    marginTop: 20,
+    padding: 32,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.divider,
   },
-  avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: AppColors.primary,
-    justifyContent: 'center',
+  usernameContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatarText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: AppColors.textWhite,
+    marginTop: 8,
   },
   fullName: {
-    fontSize: 24,
-    fontWeight: 'bold',
     color: AppColors.textPrimary,
+    marginTop: 16,
   },
   username: {
-    fontSize: 16,
     color: AppColors.textMuted,
+    marginRight: 8,
   },
   menu: {
     flex: 1,
+    padding: 16,
   },
   menuItem: {
     flexDirection: 'row',
@@ -106,13 +197,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: AppColors.divider,
   },
+  menuItemIcon: {
+    width: 30,
+    marginRight: 16,
+  },
   menuItemText: {
-    fontSize: 16,
-    marginLeft: 16,
+    flex: 1,
     color: AppColors.textPrimary,
   },
   footer: {
-    paddingBottom: 20,
+    padding: 16,
   },
   button: {
     flexDirection: 'row',
@@ -122,13 +216,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   logoutButton: {
-    backgroundColor: AppColors.accent,
+    backgroundColor: AppColors.error,
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
     color: AppColors.textWhite,
-    marginLeft: 8,
   },
 });
 

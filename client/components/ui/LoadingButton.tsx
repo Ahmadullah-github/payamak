@@ -7,8 +7,10 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
+  AccessibilityState,
 } from 'react-native';
 import { AppColors } from '../../constants/colors';
+import { useTheme } from '../../constants/theme';
 
 interface LoadingButtonProps {
   title: string;
@@ -18,6 +20,9 @@ interface LoadingButtonProps {
   variant?: 'primary' | 'secondary';
   style?: ViewStyle;
   textStyle?: TextStyle;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  testID?: string;
 }
 
 export default function LoadingButton({
@@ -28,8 +33,17 @@ export default function LoadingButton({
   variant = 'primary',
   style,
   textStyle,
+  accessibilityLabel,
+  accessibilityHint,
+  testID,
 }: LoadingButtonProps) {
+  const { spacing, typography } = useTheme();
   const isDisabled = disabled || loading;
+
+  const accessibilityState: AccessibilityState = {
+    disabled: isDisabled,
+    busy: loading,
+  };
 
   return (
     <Pressable
@@ -41,6 +55,10 @@ export default function LoadingButton({
       ]}
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={accessibilityState}
+      testID={testID}
     >
       {loading ? (
         <ActivityIndicator 
@@ -51,6 +69,11 @@ export default function LoadingButton({
         <Text 
           style={[
             styles.buttonText,
+            { 
+              fontSize: typography.button.fontSize,
+              fontWeight: typography.button.fontWeight,
+              lineHeight: typography.button.lineHeight
+            },
             variant === 'primary' ? styles.primaryText : styles.secondaryText,
             textStyle,
           ]}
@@ -83,8 +106,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    textAlign: 'center',
   },
   primaryText: {
     color: AppColors.textWhite,
